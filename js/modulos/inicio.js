@@ -1,6 +1,8 @@
 // Inicio: saludo, estado de la conexión y primeros pasos para dejar lista la base.
 import { estado, alCambiar } from '../datos.js';
-import { esc, fechaLarga } from '../ui.js';
+import { esc, fechaLarga, numero } from '../ui.js';
+import { insumosActivos, bajoMinimo } from '../stock.js';
+import { nombreUnidad } from '../comunes.js';
 
 function saludo() {
   const h = new Date().getHours();
@@ -30,8 +32,44 @@ function pasos() {
       titulo: 'Revisa las listas',
       detalle: 'Tipos de insumo, categorías de pieza, canales de venta, áreas del negocio. Vienen con valores de ejemplo para ajustar a cómo trabaja el taller.',
       ir: '#/configuracion/listas'
+    },
+    {
+      hecho: insumosActivos().length > 0,
+      titulo: 'Crea los insumos del taller',
+      detalle: 'Arcillas, materias primas de esmaltes, esmaltes comprados, embalaje. Con su unidad y, si lo sabes, su costo.',
+      ir: '#/produccion/insumos'
+    },
+    {
+      hecho: insumosActivos().some((i) => i.conMovimientos),
+      titulo: 'Carga el inventario inicial',
+      detalle: 'Lo que ya hay en el taller y cuánto vale. No crea gastos: solo deja la bodega al día.',
+      ir: '#/inventario/bodega'
     }
   ];
+}
+
+function bodega() {
+  const activos = insumosActivos();
+  if (!activos.length) {
+    return `
+        <section class="panel">
+          <h2>Bodega</h2>
+          <p class="texto-suave">Todavía no hay insumos. Crea las arcillas, materias primas y esmaltes en <a href="#/produccion/insumos">Producción → Insumos</a> y después carga lo que ya tienes con el inventario inicial.</p>
+        </section>`;
+  }
+  const bajos = activos.filter(bajoMinimo);
+  return `
+        <section class="panel">
+          <div class="panel-cabecera">
+            <h2>Bodega</h2>
+            <a href="#/inventario/bodega" class="enlace-chico">Ver inventario</a>
+          </div>
+          ${bajos.length ? `
+            <p class="texto-suave">Bajo el stock mínimo:</p>
+            <ul class="lista-bajos">
+              ${bajos.slice(0, 8).map((i) => `<li><span>${esc(i.nombre)}</span><span class="texto-alerta">${numero(i.stock || 0)} de ${numero(i.stockMinimo)} ${esc(nombreUnidad(i.unidad))}</span></li>`).join('')}
+            </ul>` : '<p class="texto-suave">Ningún insumo está bajo su mínimo.</p>'}
+        </section>`;
 }
 
 function localStorageSeguro(clave) {
@@ -68,11 +106,13 @@ export default {
           </ol>
         </section>
 
+        ${bodega()}
+
         <section class="panel">
           <h2>Cómo sigue el sistema</h2>
           <ol class="fases">
-            <li class="fase-actual"><strong>Base</strong><span>Acceso, configuración y listas. Es esta versión.</span></li>
-            <li><strong>Producción, inventario y gastos</strong><span>Insumos, recetas de esmaltes y piezas, compras por XML o a mano que suman stock, quemas, lotes por etapa con mermas.</span></li>
+            <li class="fase-hecha"><strong>Base</strong><span>Acceso, configuración y listas.</span></li>
+            <li class="fase-actual"><strong>Producción, inventario y gastos</strong><span>Ya están insumos, recetas y bodega (2a). Siguen gastos con XML o a mano que suman stock (2b), y piezas, quemas y lotes por etapa con mermas (2c).</span></li>
             <li><strong>Ventas y cobranza</strong><span>Venta rápida y ferias, clientes, consignaciones, órdenes de venta, facturación en el SII y cobros.</span></li>
             <li><strong>Agenda y clases</strong><span>Calendario de quemas, ferias, clases, entregas y compromisos de pago.</span></li>
           </ol>

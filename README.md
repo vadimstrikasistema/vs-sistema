@@ -7,7 +7,7 @@ Sistema de gestión del taller de cerámica Vadim Strika: producción por etapas
 - **Datos:** Firebase Firestore (plan gratuito Spark), con caché local para trabajar sin señal.
 - **Acceso:** Firebase Authentication con correo y contraseña, más una lista de correos permitidos.
 
-Versión actual: **0.1.3** (Fase 1, base).
+Versión actual: **0.2.0** (Fase 2, entrega 2a: insumos, recetas y bodega).
 
 ---
 
@@ -80,6 +80,10 @@ Estas decisiones se respetan en todas las fases:
 - **Costeo:** por última compra (por defecto) o promedio ponderado. Con factura el costo es el neto (el IVA es crédito fiscal); con boleta, todo lo pagado.
 - **Sin señal:** la app sigue funcionando y guarda en el equipo; al volver la conexión sincroniza sola. La primera vez en cada equipo se necesita internet.
 - **Notas explicativas (i)** en cada campo o flujo que no se entiende solo.
+- **Stock de insumos:** cada insumo guarda su `stock` y su `valorStock`, que se actualizan con cada movimiento en el mismo lote de escritura (funciona sin señal). Las salidas salen a costo promedio, para que el valor de la bodega cuadre; las recetas y piezas se costean con el método elegido en Configuración.
+- **Inventario inicial, ajustes y conteos no son gastos.** Solo corrigen cuánto hay y lo que vale. Las compras con documento entran por Gastos (entrega 2b).
+- **Recetas por porcentaje:** la base suma 100 % y las adiciones (colorantes, opacificantes) van sobre la base. Lo preparado entra a bodega como un insumo elaborado con el nombre de la receta. Editar una receta no cambia las preparaciones anteriores.
+- **Movimientos inmutables:** las reglas de Firestore no dejan cambiar un movimiento; solo marcarlo como anulado, y la anulación crea el movimiento contrario.
 
 ## Estructura de datos
 
@@ -89,6 +93,11 @@ Estas decisiones se respetan en todas las fases:
 | `config` | `empresa` | Nombre de fantasía, razón social, RUT, giro, dirección, contacto |
 | `config` | `costeo` | Método de costeo (`ultima` o `promedio`) e IVA |
 | `listas` | una por lista | `nombre`, `descripcion`, `items[]` con `id`, `nombre`, `activo`, `orden` y `fijo` |
+| `insumos` | uno por material | `nombre`, `tipo`, `unidad`, `stockMinimo`, `formatos[]`, `costoRef`, `costoUltimo`, y el resumen `stock` y `valorStock`. `elaborado` y `recetaId` si lo produce una receta. `archivado` |
+| `recetas` | una por receta | `nombre`, `tipo` (esmalte, engobe, pasta, otro), `ingredientes[]` con `insumoId`, `pct` y `adicion`, `insumoId` del resultado, `notas` |
+| `movimientos` | uno por entrada o salida | `fecha`, `tipo` (inicial, ajuste, conteo, preparacion, compra, anulacion), `insumoId`, `cantidad` con signo, `costoUnitario`, `valor`, `motivo`, `ref` al documento que lo originó, `anulado` |
+| `preparaciones` | una por vez que se prepara una receta | receta, base seca, ingredientes pesados con su costo, cantidad resultante, costo unitario y los movimientos que generó |
+| `conteos` | uno por conteo físico | fecha, lo contado y la diferencia por insumo |
 
 Listas iniciales: tipos de insumo, unidades, categorías de pieza, canales de venta, medios de pago, áreas del negocio, ítems de gasto, motivos de merma y motivos de ajuste de inventario.
 
@@ -116,11 +125,23 @@ fonts/, img/            tipografías y logo (incluidos para funcionar sin señal
 ## Plan por fases
 
 1. **Base** · acceso, reglas de seguridad, Configuración y listas editables. ✔
-2. **Producción, inventario y gastos** · insumos y formatos, recetas de esmaltes, engobes y pastas, fichas de pieza con costo, compras por XML del SII o a mano que suman stock, inventario inicial y ajustes, quemas y lotes por etapa con mermas.
+2. **Producción, inventario y gastos**, en tres entregas:
+   - **2a** · insumos con formatos de compra y calculadora de costo, recetas de esmaltes, engobes y pastas por porcentaje, preparación que descuenta y suma stock, bodega con inventario inicial, ajustes, conteo físico e historial. ✔
+   - **2b** · gastos con XML del SII o a mano; cada línea como insumo (suma stock) o gasto general, con aprendizaje por proveedor, duplicados y alertas de precio.
+   - **2c** · fichas de pieza (pasta, esmalte, horas, tamaño S, M, L, XL en el horno), quemas con horno eléctrico o a gas, lotes por etapa con mermas, piezas de segunda, inventario de piezas.
 3. **Ventas y cobranza** · venta rápida y ferias, clientes, consignaciones con liquidación, órdenes de venta con PDF y WhatsApp, por facturar con el favorito que rellena el facturador del SII, encargos con abono, cobranza y pagos.
 4. **Agenda y clases** · calendario con quemas, ferias, clases, entregas y compromisos de pago.
 
 ## Historial de versiones
+
+### 0.2.0 · Fase 2, entrega 2a: insumos, recetas y bodega
+- **Producción → Insumos:** catálogo por tipo con búsqueda, unidad, stock mínimo, formatos de compra, costo de referencia con calculadora (precio ÷ contenido) y archivo.
+- **Producción → Recetas:** recetas por porcentaje con adiciones, costo por kg en vivo, aviso si la base no suma 100 %. Preparar una receta calcula cuánto pesar de cada ingrediente, descuenta de bodega y suma lo preparado; se puede anular.
+- **Inventario → Bodega:** stock y valor por insumo, avisos de stock bajo y de insumos sin costo, historial por insumo, ajustes con motivo, inventario inicial en una sola tabla y conteo físico que crea los ajustes de las diferencias.
+- **Inventario → Movimientos:** todas las entradas y salidas, con anulación.
+- **Inicio:** pasos para crear insumos y cargar el inventario inicial, y aviso de stock bajo.
+- **Reglas de Firestore nuevas** para insumos, recetas, movimientos, preparaciones y conteos. **Hay que volver a publicarlas.**
+- Estructura de datos versión 2 (se actualiza sola al entrar).
 
 ### 0.1.3 · Ícono circular
 - Ícono de la app con el logo original: círculo blanco, aro gris y letras negras. Versión adaptable para Android y iPhone.

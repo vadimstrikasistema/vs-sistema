@@ -11,6 +11,8 @@ export const estado = {
   costeo: null,
   sistema: null,
   listas: {},       // clave → { nombre, descripcion, items[] }
+  insumos: {},      // id → insumo (incluye su stock y valor guardados)
+  recetas: {},      // id → receta
   listo: false
 };
 
@@ -40,7 +42,15 @@ export async function prepararBase() {
     }
     throw e;
   }
-  if (snap.exists()) return snap.data();
+  if (snap.exists()) {
+    const datos = snap.data();
+    // Actualización de estructura: cada versión solo agrega, nunca borra.
+    if ((datos.schemaVersion ?? 1) < SCHEMA_VERSION) {
+      await setDoc(ref, { schemaVersion: SCHEMA_VERSION, migradoConApp: APP_VERSION, ...firma() }, { merge: true });
+      datos.schemaVersion = SCHEMA_VERSION;
+    }
+    return datos;
+  }
 
   const b = writeBatch(db);
   const f = firma();
@@ -66,6 +76,20 @@ export function escuchar() {
     const listas = {};
     qs.forEach((d) => { listas[d.id] = d.data(); });
     estado.listas = listas;
+    avisar();
+  }, errorEscucha));
+  // Insumos y recetas son pocos (decenas o cientos): se escuchan completos.
+  // Los movimientos, que crecen todo el tiempo, se consultan solo cuando se miran.
+  desuscribir.push(onSnapshot(collection(db, 'insumos'), (qs) => {
+    const m = {};
+    qs.forEach((d) => { m[d.id] = { id: d.id, ...d.data() }; });
+    estado.insumos = m;
+    avisar();
+  }, errorEscucha));
+  desuscribir.push(onSnapshot(collection(db, 'recetas'), (qs) => {
+    const m = {};
+    qs.forEach((d) => { m[d.id] = { id: d.id, ...d.data() }; });
+    estado.recetas = m;
     avisar();
   }, errorEscucha));
 }

@@ -10,7 +10,7 @@ export function crearPendiente({ titulo, fase, resumen, puntos }) {
           <p class="pagina-bajada">${esc(resumen)}</p>
         </header>
         <section class="panel pendiente">
-          <p class="pendiente-fase">Llega en la fase ${fase}</p>
+          <p class="pendiente-fase">Llega en ${String(fase).length > 1 ? 'la entrega' : 'la fase'} ${fase}</p>
           <ul class="lista-puntos">
             ${puntos.map((p) => `<li>${esc(p)}</li>`).join('')}
           </ul>

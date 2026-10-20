@@ -40,13 +40,63 @@ service cloud.firestore {
       allow delete: if false;
     }
 
+    // Insumos y recetas: se crean y editan; lo que deja de usarse se archiva.
+    match /insumos/{id} {
+      allow read: if permitido();
+      allow create, update: if permitido() && firmado()
+        && request.resource.data.nombre is string
+        && request.resource.data.unidad is string;
+      allow delete: if false;
+    }
+    match /recetas/{id} {
+      allow read: if permitido();
+      allow create, update: if permitido() && firmado()
+        && request.resource.data.ingredientes is list;
+      allow delete: if false;
+    }
+
+    // Movimientos de stock: una vez creados no se modifican.
+    // Lo único que se permite después es marcarlos como anulados.
+    match /movimientos/{id} {
+      allow read: if permitido();
+      allow create: if permitido() && firmado()
+        && request.resource.data.cantidad is number
+        && request.resource.data.insumoId is string
+        && request.resource.data.anulado == false;
+      allow update: if permitido() && firmado()
+        && resource.data.anulado == false
+        && request.resource.data.anulado == true
+        && request.resource.data.diff(resource.data).affectedKeys()
+             .hasOnly(['anulado', 'anuladoEn', 'anulacionId', 'actualizado', 'actualizadoPor']);
+      allow delete: if false;
+    }
+
+    // Preparaciones de recetas: igual que los movimientos, solo se anulan.
+    match /preparaciones/{id} {
+      allow read: if permitido();
+      allow create: if permitido() && firmado() && request.resource.data.anulado == false;
+      allow update: if permitido() && firmado()
+        && resource.data.anulado == false
+        && request.resource.data.anulado == true
+        && request.resource.data.diff(resource.data).affectedKeys()
+             .hasOnly(['anulado', 'anuladoEn', 'actualizado', 'actualizadoPor']);
+      allow delete: if false;
+    }
+
+    // Conteos físicos: registro histórico, no se modifican.
+    match /conteos/{id} {
+      allow read: if permitido();
+      allow create: if permitido() && firmado();
+      allow update, delete: if false;
+    }
+
     // Colecciones de las fases siguientes (insumos, piezas, ventas, gastos…).
     // Se leen y escriben solo con permiso; nunca se borran.
-    // (Excluye config y listas para no saltarse sus reglas de arriba:
+    // (Excluye las colecciones de arriba para no saltarse sus reglas:
     // en Firestore basta que una regla permita para que se permita.)
     match /{coleccion}/{docId} {
       allow read: if permitido();
-      allow create, update: if permitido() && !(coleccion in ['config', 'listas']);
+      allow create, update: if permitido() && !(coleccion in ['config', 'listas', 'insumos', 'recetas', 'movimientos', 'preparaciones', 'conteos']);
       allow delete: if false;
     }
   }

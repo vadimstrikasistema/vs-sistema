@@ -38,9 +38,16 @@ export const {
   collection,
   doc,
   getDoc,
+  getDocs,
   getDocFromServer,
   onSnapshot,
   setDoc,
+  updateDoc,
   writeBatch,
-  serverTimestamp
+  serverTimestamp,
+  increment,
+  query,
+  where,
+  orderBy,
+  limit
 } = fsMod;

@@ -21,16 +21,10 @@ const MODULOS = [
     fase: 3, resumen: 'Qué se debe, quién lo debe y desde cuándo.',
     puntos: ['Folios pendientes por cliente con días de atraso', 'Recordatorios por WhatsApp en tono amable o firme', 'Estado de cuenta en PDF', 'Pagos parciales y un pago para varias facturas']
   } },
-  { clave: 'produccion', titulo: 'Producción', pendiente: {
-    fase: 2, resumen: 'Recetas, quemas y lotes que avanzan por etapas, con el costo real de cada pieza.',
-    puntos: ['Insumos y materias primas con unidad y formato de compra', 'Recetas de esmaltes, engobes y pastas', 'Fichas de pieza: pasta, esmalte, horas y espacio en el horno', 'Lotes por etapa: modelado, secado, bizcocho, esmaltado, quema de esmalte', 'Mermas con motivo y piezas de segunda', 'Quemas con energía usada y su costo repartido']
-  } },
-  { clave: 'inventario', titulo: 'Inventario', pendiente: {
-    fase: 2, resumen: 'Piezas terminadas, en proceso y en consignación, y materiales en bodega.',
-    puntos: ['Stock de piezas por ubicación: bodega o local de cada cliente', 'Piezas en proceso por etapa', 'Insumos y materias primas en bodega', 'Inventario inicial y ajustes con motivo, sin crear gastos', 'Conteo físico que genera los ajustes de una vez']
-  } },
+  { clave: 'produccion', titulo: 'Producción', carga: () => import('./modulos/produccion.js') },
+  { clave: 'inventario', titulo: 'Inventario', carga: () => import('./modulos/inventario.js') },
   { clave: 'gastos', titulo: 'Gastos', pendiente: {
-    fase: 2, resumen: 'Compras y gastos, a mano o desde el XML del SII. Las compras de insumos suman stock solas.',
+    fase: '2b', resumen: 'Compras y gastos, a mano o desde el XML del SII. Las compras de insumos suman stock solas.',
     puntos: ['Carga de XML de facturas de compra, en lote', 'Ingreso a mano con RUT y folio, y gastos sin documento', 'Cada línea como insumo (suma stock) o gasto general', 'El sistema aprende qué insumo es cada producto de cada proveedor', 'Detección de facturas duplicadas y alertas de precio', 'Por pagar, cuentas recurrentes y análisis por área']
   } },
   { clave: 'configuracion', titulo: 'Configuración', carga: () => import('./modulos/configuracion.js') }
