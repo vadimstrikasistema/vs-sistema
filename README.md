@@ -179,6 +179,13 @@ fonts/, img/            tipografías y logo (incluidos para funcionar sin señal
 
 ## Historial de versiones
 
+### 1.1.2 · Ajustes de pantalla
+- Las notas (i) se ven dentro de las ventanas (antes quedaban detrás) y se cierran al desplazar.
+- En el celular, la barra de pestañas solo se desliza de lado y la página no se mueve de lado a lado ni rebota.
+
+### 1.1.1 · Más ancho en el computador
+- En pantallas anchas el contenido ocupa hasta unos 1.360 px.
+
 ### 1.1.0 · Ventas, Empresas y la nueva Cobranza
 - **Menú:** Ventas queda para las personas (venta rápida, encargos, ferias, historial, clientes finales, análisis) y **Empresas** reúne órdenes, consignación, por facturar, clientes empresa y un **análisis por tienda** (lo que compra, su margen, lo que tiene en consignación, cuánto vende de lo que dejas, última visita, lo que debe y lo que falta facturar). Los enlaces antiguos siguen funcionando. La barra del celular: Inicio, Ventas, Empresas, Cobranza y Más.
 - **Queda debiendo:** una venta a una persona se puede registrar sin cobrar (con su cliente); queda en Cobranza hasta que pague.

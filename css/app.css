@@ -45,7 +45,9 @@
 }
 
 *, *::before, *::after { box-sizing: border-box; }
-html { -webkit-text-size-adjust: 100%; }
+html { -webkit-text-size-adjust: 100%; overscroll-behavior-y: none; }
+/* Nada se sale de lado: evita que la página «baile» de lado a lado en el celular. */
+html, body { overflow-x: clip; }
 body {
   margin: 0;
   background: var(--loza);
@@ -113,7 +115,7 @@ button, input, select, textarea { font: inherit; color: inherit; }
 }
 .info:hover { border-color: var(--cobalto); color: var(--cobalto); }
 .info-pop {
-  position: absolute; z-index: 60; padding: 12px 14px;
+  position: fixed; z-index: 60; max-height: calc(100dvh - 32px); overflow-y: auto; box-shadow: 0 8px 24px rgba(43, 40, 37, 0.25); padding: 12px 14px;
   background: var(--carbon); color: var(--loza); border-radius: var(--r-chico);
   font-size: 0.875rem; line-height: 1.45;
 }
@@ -270,8 +272,9 @@ body.modo-login { background: var(--loza); }
 .lista-puntos li::marker { color: var(--ocre); }
 
 /* ------------------------------------------------------------ Configuración */
-.pestanas { display: flex; gap: 4px; margin-bottom: 18px; overflow-x: auto; scrollbar-width: none; border-bottom: 1px solid var(--borde); }
-.pestana { padding: 10px 14px; color: var(--tinta-suave); text-decoration: none; font-weight: 500; border-bottom: 2px solid transparent; margin-bottom: -1px; white-space: nowrap; }
+.pestanas { display: flex; gap: 4px; margin-bottom: 18px; overflow-x: auto; overflow-y: hidden; overscroll-behavior-x: contain; scrollbar-width: none; box-shadow: inset 0 -1px 0 var(--borde); }
+.pestanas::-webkit-scrollbar { display: none; }
+.pestana { padding: 10px 14px; color: var(--tinta-suave); text-decoration: none; font-weight: 500; border-bottom: 2px solid transparent; white-space: nowrap; }
 .pestana:hover { color: var(--tinta); }
 .pestana.activa { color: var(--cobalto); border-bottom-color: var(--cobalto); }
 .pestanas:has(.pestana:nth-child(7)) .pestana { padding: 10px 10px; }
@@ -479,7 +482,7 @@ h3 { font-size: 0.95rem; font-weight: 600; margin: 8px 0 0; }
 .segmentado label:has(input:checked) { border-color: var(--cobalto); background: var(--cobalto-claro); color: var(--cobalto-osc); font-weight: 600; }
 
 /* Tablas */
-.tabla-scroll { overflow-x: auto; border: 1px solid var(--borde); border-radius: var(--r-chico); }
+.tabla-scroll { overflow-x: auto; overflow-y: hidden; overscroll-behavior-x: contain; border: 1px solid var(--borde); border-radius: var(--r-chico); }
 .tabla { width: 100%; border-collapse: collapse; font-size: 0.92rem; font-variant-numeric: tabular-nums; }
 .tabla th, .tabla td { padding: 9px 12px; text-align: left; border-bottom: 1px solid var(--borde); vertical-align: middle; }
 .tabla thead th { font-size: 0.78rem; font-weight: 500; color: var(--tinta-tenue); background: var(--loza); white-space: nowrap; }
@@ -908,7 +911,7 @@ body.modo-feria .contenido { padding: 0; margin: 0; max-width: none; min-height:
 .mf-hoy-etq { font-size: 0.72rem; opacity: 0.8; }
 .mf-filtros { display: flex; flex-direction: column; gap: 8px; padding: 12px 14px 4px; }
 .mf-filtros .buscador { width: 100%; flex: none; }
-.mf-cats { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; }
+.mf-cats { display: flex; gap: 6px; overflow-x: auto; overflow-y: hidden; overscroll-behavior-x: contain; scrollbar-width: none; }
 .mf-cat { flex: none; min-height: 38px; padding: 0 14px; border-radius: 999px; border: 1px solid var(--borde-fuerte); background: #fff; color: var(--tinta); font-weight: 500; cursor: pointer; }
 .mf-cat.activa { background: var(--cobalto); border-color: var(--cobalto); color: #fff; }
 .mf-grilla { flex: 1; display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; padding: 10px 14px 110px; align-content: start; }

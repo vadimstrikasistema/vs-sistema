@@ -2,7 +2,7 @@
 // Este archivo es público (va en GitHub Pages). La protección real de los
 // datos está en las reglas de Firestore (firestore.rules).
 
-export const APP_VERSION = '1.1.1';
+export const APP_VERSION = '1.1.2';
 
 // Versión de la estructura de datos. Se sube cuando una fase agrega
 // colecciones o campos nuevos. Debe coincidir con config/sistema en Firestore.

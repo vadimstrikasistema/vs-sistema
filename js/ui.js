@@ -12,23 +12,32 @@ export function info(texto) {
   return `<button type="button" class="info" aria-label="Más información" data-info="${esc(texto)}">i</button>`;
 }
 
+// La nota se abre dentro de la ventana (diálogo) donde está el botón: los diálogos
+// quedan en una capa propia, por encima de todo lo demás de la página.
+const cerrarNotas = () => $$('.info-pop').forEach((p) => p.remove());
 document.addEventListener('click', (e) => {
   const btn = e.target.closest('.info');
-  $$('.info-pop').forEach((p) => p.remove());
+  if (e.target.closest('.info-pop')) return;
+  cerrarNotas();
   if (!btn) return;
   e.preventDefault();
+  e.stopPropagation();
   const pop = document.createElement('div');
   pop.className = 'info-pop';
   pop.setAttribute('role', 'tooltip');
   pop.textContent = btn.dataset.info;
-  document.body.append(pop);
+  (btn.closest('dialog[open]') || document.body).append(pop);
   const r = btn.getBoundingClientRect();
   const w = Math.min(300, window.innerWidth - 32);
   pop.style.width = w + 'px';
-  const left = Math.max(16, Math.min(r.left + r.width / 2 - w / 2, window.innerWidth - w - 16));
-  pop.style.left = left + 'px';
-  pop.style.top = (r.bottom + window.scrollY + 8) + 'px';
-});
+  pop.style.left = Math.max(16, Math.min(r.left + r.width / 2 - w / 2, window.innerWidth - w - 16)) + 'px';
+  const alto = pop.offsetHeight;
+  const abajo = r.bottom + 8;
+  pop.style.top = (abajo + alto > window.innerHeight - 8 && r.top - alto - 8 > 8 ? r.top - alto - 8 : abajo) + 'px';
+}, true);
+// Al desplazar la página o una ventana, la nota se cierra (si no, quedaría flotando fuera de lugar).
+window.addEventListener('scroll', cerrarNotas, true);
+window.addEventListener('resize', cerrarNotas);
 
 // Mensajes breves abajo de la pantalla.
 export function toast(mensaje, tipo = 'ok') {
