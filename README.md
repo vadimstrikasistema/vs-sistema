@@ -107,7 +107,7 @@ Estas decisiones se respetan en todas las fases:
 | `movimientos` | uno por entrada o salida | `fecha`, `tipo` (inicial, ajuste, conteo, preparacion, compra, anulacion), `insumoId`, `cantidad` con signo, `costoUnitario`, `valor`, `motivo`, `ref` al documento que lo originó, `anulado` |
 | `preparaciones` | una por vez que se prepara una receta | receta, base seca, ingredientes pesados con su costo, cantidad resultante, costo unitario y los movimientos que generó |
 | `conteos` | uno por conteo físico | fecha, lo contado y la diferencia por insumo |
-| `gastos` | uno por factura, boleta o gasto sin documento | `origen` (xml o manual), `tipoDoc` (33, 34, 39, 61, 0…), `folio`, `fecha`, `mes`, `rutProveedor`, `rutLimpio`, `proveedor`, `neto`, `exento`, `iva`, `total`, `lineas[]` con su clase (`insumo` con `insumoId` y `factor`, o `gasto` con `itemGasto` y `area`), `estado` (por-clasificar o clasificado), `pagoEstado`, `pago`, `movs` (stock que generó), `automatico`, `revisado`, `anulado` |
+| `gastos` | uno por factura, boleta o gasto sin documento | `origen` (xml o manual), `tipoDoc` (33, 34, 39, 61, 0…), `folio`, `fecha`, `mes`, `rutProveedor`, `rutLimpio`, `proveedor`, `neto`, `exento`, `iva`, `total`, `lineas[]` con su clase (`insumo` con `insumoId` y `factor`, o `gasto` con `itemGasto` y `area`), `estado` (por-clasificar o clasificado), `pagoEstado`, `pago`, `movs` (stock que generó), `automatico`, `revisado`, `recurrenteId` y `periodo` si es de una cuenta recurrente, `anulado` |
 | `proveedores` | uno por RUT (sin puntos) | nombre, giro y lo aprendido: `items` (cómo se clasificó cada producto y cuántas veces igual) y `defecto` para líneas nuevas |
 | `piezas` | una por ficha (serie o pieza única) | `nombre`, `tipo`, `categoria`, `tamano` (S, M, L, XL), `pastaId` y `pastaKg`, `esmaltes[]` (insumo y gramos por pieza), `sinEsmalte`, `otros[]`, `horas`, `precioB2C` (con IVA), `precioB2B` (neto), y el resumen `stock`, `stockSegunda`, `valorStock`, `costoUltimo`; `estadoUnica` en piezas únicas |
 | `lotes` | uno por tanda de piezas | pieza, `cantidadInicial`, `cantidadActual`, `etapa` (modelado, seco, bizcochado, esmaltado, terminado), `estado`, `historial[]` de cada etapa con lo que entró, salió y se perdió (y por qué), costos acumulados (`costoPasta`, `costoEsmalte`, `costoOtros`, `costoHoras`, `costoQuemas`, `creditoReciclaje`), al terminar `primera`, `segunda`, `costoUnitario`, y los movimientos que generó |
@@ -123,6 +123,7 @@ Estas decisiones se respetan en todas las fases:
 | `consignaciones` | una por tienda con piezas en consignación | `numero`, `fecha`, cliente, `lineas[]` (`key`, pieza, `calidad`, precio neto, `costoUnitario`, `entregadas`, `vendidas`, `devueltas`, `perdidas`), `entregas[]`, `liquidaciones[]` (fecha, vendidas, vuelven, vuelven dañadas, perdidas y su costo, `ordenId`), `cerrada`, `nota`, `anulada` |
 | `encargos` | uno por encargo de un cliente | `numero`, `fecha`, `fechaEntrega`, `canal`, cliente, `lineas[]` (pieza o sin ficha, cantidad, precio con IVA), `total`, `nota`, `abonos[]` (`monto`, `medio`, `fecha`, `devuelto`), `estado` (pendiente, taller, listo, entregado, anulado), `historial[]`, `ventaId`, `fechaEntregado` |
 | `eventos` | uno por evento propio de la agenda | `titulo`, `tipo` (entrega, clase, quema, compra, reunion, otro), `lugar`, `fecha`, `fechaFin`, `hora`, `horaFin`, `nota`, `hecho`, `anulado` |
+| `recurrentes` | una por cuenta que se repite | `nombre`, `proveedor`, `rutProveedor`, `rutLimpio`, `tipoDoc`, `itemGasto`, `area`, `frecuencia` (meses: 1, 2, 3, 6, 12), `dia` de vencimiento, `inicio` (primer mes), `montoEstimado`, `medio`, `nota`, `registros` (por mes `YYYY-MM`: `gastoId`, `total`, `estado` pagado o por-pagar), `creadoMes`, `activo` |
 | `alertasPrecio` | una por cambio de precio de 10 % o más | insumo, costo anterior y nuevo, variación, proveedor, documento, recetas afectadas, `visto` |
 
 Listas iniciales: tipos de insumo, unidades, categorías de pieza, canales de venta, medios de pago, áreas del negocio, ítems de gasto, motivos de merma y motivos de ajuste de inventario.
@@ -146,6 +147,7 @@ js/b2b-core.js          órdenes de venta, consignación y paso a factura
 js/favorito-sii.js      favorito que rellena el facturador gratuito del SII
 js/encargos-core.js     encargos con abono
 js/agenda-core.js       todo lo que tiene fecha, para la agenda
+js/recurrentes-core.js  cuentas que se repiten y el registro de cada mes
 js/modulos/             una pantalla por módulo
 fonts/, img/            tipografías y logo (incluidos para funcionar sin señal)
 ```
@@ -165,9 +167,17 @@ fonts/, img/            tipografías y logo (incluidos para funcionar sin señal
    - **3c** · órdenes de venta con PDF por WhatsApp, consignaciones con liquidación y facturación con el favorito del facturador del SII, conectadas con la cobranza. ✔ Pendiente: confirmar los nombres de campo del facturador con el favorito que ya usa el taller, y guía de despacho para consignación si hace falta.
 4. **Agenda y encargos**:
    - **4a** · encargos con abono y agenda con eventos propios (clases, quemas, entregas), ferias, encargos, órdenes por entregar y vencimientos de cobro. ✔
-   - Siguen: gastos recurrentes y por pagar en la agenda, clases con alumnos, contactos de feria con QR, modo feria y conteo de piezas (enero).
+   - **4b** · cuentas recurrentes (luz, arriendo, internet, contador) y gastos por pagar en la agenda. ✔
+   - Siguen: clases con alumnos, contactos de feria con QR, modo feria y conteo de piezas (enero).
 
 ## Historial de versiones
+
+### 0.9.0 · Entrega 4b: cuentas recurrentes y pagos en la agenda
+- **Gastos → Recurrentes:** cuentas que se repiten (mensual, cada 2, 3 o 6 meses, anual) con proveedor, RUT, documento que llega, ítem, área, día de vencimiento y monto aproximado. Cada mes muestra si está al día, por vencer o atrasada, y cuánto se estima y se registró en el mes.
+- **Registrar un mes:** se anota como gasto normal (sin documento, boleta o factura con su IVA), pagado o por pagar; o se vincula con la factura que ya se subió como XML, sin duplicar. Si se anula el gasto, el mes vuelve a quedar pendiente; al marcarlo pagado en «Por pagar», el mes también.
+- **Agenda:** aparecen los gastos por pagar en su vencimiento (los vencidos, hoy) y las cuentas recurrentes de cada mes; desde la agenda se registran. Inicio los muestra en «Esta semana».
+- **Reglas de Firestore nuevas** para cuentas recurrentes. **Hay que volver a publicarlas.**
+- Estructura de datos versión 9.
 
 ### 0.8.0 · Entrega 4a: encargos y agenda
 - **Ventas → Encargos:** piezas a pedido (con ficha o sin ella) con precio con IVA, detalles, fecha de entrega y uno o varios abonos con su medio de pago. Estados: por empezar, en el taller, listo y entregado; aviso por WhatsApp cuando está listo, con el saldo y los datos de transferencia. Al entregar se cobra el saldo y se registra la venta completa, con cada abono como parte del pago, y las piezas salen del stock. Si se anula la venta, el encargo vuelve a «listo». Al anular un encargo se anota si se devolvió el abono.

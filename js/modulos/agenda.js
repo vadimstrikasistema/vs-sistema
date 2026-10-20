@@ -9,6 +9,8 @@ import { detalleEncargo, dialogoEncargo } from './encargos.js';
 import { detalleOrden } from './ventas-b2b.js';
 import { detalleFeria, editarFeria } from './venta-rapida.js';
 import { ICONOS } from '../iconos.js';
+import { registrarDialogo, editarRecurrente } from './recurrentes.js';
+import { marcarPagado } from './gastos.js';
 
 const fallo = avisoError(toast);
 const DIAS = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
@@ -27,6 +29,8 @@ export function abrirItem(it) {
   if (it.origen === 'orden') return detalleOrden(estado.ordenes[it.id]);
   if (it.origen === 'feria') return detalleFeria(estado.ferias[it.id]);
   if (it.origen === 'cobro') { location.hash = '#/cobranza/por-cobrar'; }
+  if (it.origen === 'recurrente') { const r = estado.recurrentes[it.id]; return it.hecho ? editarRecurrente(r) : registrarDialogo(r, it.periodo); }
+  if (it.origen === 'gasto' && it.gasto) return marcarPagado(it.gasto);
   return null;
 }
 
@@ -43,10 +47,11 @@ export default {
     let mes = /^\d{4}-\d{2}$/.test(sub || '') ? `${sub}-01` : hoy;
     let dia = mes.slice(0, 7) === hoy.slice(0, 7) ? hoy : mes;
     let facturas = [];
+    let gastos = [];
     el.innerHTML = `
       <header class="pagina-cabecera">
         <h1>Agenda</h1>
-        <p class="pagina-bajada">Todo lo que tiene fecha en el taller: entregas, ferias, clases, quemas y cobros.</p>
+        <p class="pagina-bajada">Todo lo que tiene fecha en el taller: entregas, ferias, clases, quemas, cobros y pagos.</p>
       </header>
       <div class="barra-herramientas ag-barra">
         <div class="grupo-botones">
@@ -67,8 +72,8 @@ export default {
       </div>
       <p class="texto-suave ag-leyenda">
         <span class="ag-punto ag-entrega"></span>Entregas <span class="ag-punto ag-feria"></span>Ferias <span class="ag-punto ag-clase"></span>Clases
-        <span class="ag-punto ag-quema"></span>Quemas <span class="ag-punto ag-cobro"></span>Vencimientos de cobro <span class="ag-punto ag-otro"></span>Otros
-        ${info('Los encargos, las órdenes por entregar, las ferias y las facturas por cobrar aparecen solos: se cambian en su propia sección. Aquí agregas lo demás, como clases, quemas o entregas sin orden.')}
+        <span class="ag-punto ag-quema"></span>Quemas <span class="ag-punto ag-cobro"></span>Cobros <span class="ag-punto ag-pago"></span>Pagos <span class="ag-punto ag-otro"></span>Otros
+        ${info('Los encargos, las órdenes por entregar, las ferias, las facturas por cobrar, los gastos por pagar y las cuentas recurrentes aparecen solos: se cambian en su propia sección. Aquí agregas lo demás, como clases, quemas o entregas sin orden.')}
       </p>`;
     $$('[data-mover]', el).forEach((b) => b.addEventListener('click', () => {
       const d = deISO(mes); d.setMonth(d.getMonth() + Number(b.dataset.mover)); d.setDate(1);
@@ -82,7 +87,7 @@ export default {
     function pintar() {
       const sem = semanasDelMes(mes);
       const desde = sem[0][0]; const hasta = sem[sem.length - 1][6];
-      const its = itemsAgenda(desde, hasta, { facturas });
+      const its = itemsAgenda(desde, hasta, { facturas, gastos });
       const porDia = new Map();
       its.forEach((it) => porDia.set(it.fecha, [...(porDia.get(it.fecha) || []), it]));
       $('[data-mes]', el).textContent = nombreMes(mes);
@@ -99,7 +104,7 @@ export default {
         }).join('')}</div>`).join('')}`;
       $$('[data-fecha]', el).forEach((b) => b.addEventListener('click', () => { dia = b.dataset.fecha; pintar(); }));
 
-      const delDia = itemsAgenda(dia, dia, { facturas });
+      const delDia = itemsAgenda(dia, dia, { facturas, gastos });
       const cajaDia = $('[data-dia]', el);
       cajaDia.innerHTML = `
         <div class="panel-cabecera"><h2>${esc(nombreDia(dia))}</h2><button class="btn btn-suave btn-chico" data-agregar-dia>Agregar</button></div>
@@ -108,7 +113,7 @@ export default {
       $$('[data-i]', cajaDia).forEach((b) => b.addEventListener('click', () => abrirItem(delDia[Number(b.dataset.i)])));
 
       const h = hoyISO();
-      const prox = itemsAgenda(h, sumar(h, 14), { facturas }).filter((it) => !(it.origen === 'evento' && it.hecho));
+      const prox = itemsAgenda(h, sumar(h, 14), { facturas, gastos }).filter((it) => !(it.origen === 'evento' && it.hecho));
       const cajaP = $('[data-proximos]', el);
       let ultimo = '';
       cajaP.innerHTML = `<h2>Próximos 14 días</h2>${prox.length ? `<ul class="ag-lista">${prox.map((it, i) => {
@@ -118,7 +123,7 @@ export default {
       }).join('')}</ul>` : '<p class="texto-suave">Nada en las próximas dos semanas.</p>'}`;
       $$('[data-i]', cajaP).forEach((b) => b.addEventListener('click', () => abrirItem(prox[Number(b.dataset.i)])));
     }
-    const des = [alCambiar(pintar), escucharDonde('facturas', 'abierta', '==', true, (l) => { facturas = l; pintar(); })];
+    const des = [alCambiar(pintar), escucharDonde('facturas', 'abierta', '==', true, (l) => { facturas = l; pintar(); }), escucharDonde('gastos', 'pagoEstado', '==', 'por-pagar', (l) => { gastos = l; pintar(); })];
     pintar();
     return () => des.forEach((u) => u());
   }

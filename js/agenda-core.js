@@ -7,6 +7,7 @@ import { refNueva, refDoc } from './stock.js';
 import { hoyISO, pesos } from './ui.js';
 import { saldo } from './cobranza-core.js';
 import { encargoActivo, saldoEncargo, resumenEncargo } from './encargos-core.js';
+import { recurrentesActivos, periodos, registro, vencimientoDe } from './recurrentes-core.js';
 
 export const TIPOS_EVENTO = {
   entrega: { nombre: 'Entrega', clase: 'ag-entrega' },
@@ -17,7 +18,7 @@ export const TIPOS_EVENTO = {
   otro: { nombre: 'Otro', clase: 'ag-otro' }
 };
 // Colores de lo que viene de otros módulos.
-export const CLASE_ORIGEN = { feria: 'ag-feria', encargo: 'ag-entrega', orden: 'ag-entrega', cobro: 'ag-cobro' };
+export const CLASE_ORIGEN = { feria: 'ag-feria', encargo: 'ag-entrega', orden: 'ag-entrega', cobro: 'ag-cobro', pago: 'ag-pago' };
 
 // ---------------------------------------------------------------- Fechas
 export const aISO = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
@@ -53,7 +54,7 @@ export const anularEvento = (lote, ev) => lote.update(refDoc('eventos', ev.id), 
 
 // ---------------------------------------------------------------- Todo lo que tiene fecha
 // Devuelve [{ fecha, hora, titulo, sub, clase, origen, id, hecho, alerta }] entre `desde` y `hasta` (incluidos).
-export function itemsAgenda(desde, hasta, { facturas = [], hoy = hoyISO() } = {}) {
+export function itemsAgenda(desde, hasta, { facturas = [], gastos = [], hoy = hoyISO() } = {}) {
   const r = [];
   const dentro = (f) => f && f >= desde && f <= hasta;
   Object.values(estado.eventos).filter((e) => !e.anulado).forEach((e) => {
@@ -81,6 +82,25 @@ export function itemsAgenda(desde, hasta, { facturas = [], hoy = hoyISO() } = {}
   });
   facturas.filter((f) => f.abierta && !f.anulada && f.vencimiento && saldo(f) > 0).forEach((f) => {
     if (dentro(f.vencimiento)) r.push({ fecha: f.vencimiento, hora: '', titulo: `Vence factura ${f.folio || ''} · ${f.clienteNombre}`, sub: `Por cobrar ${pesos(saldo(f))}`, clase: CLASE_ORIGEN.cobro, origen: 'cobro', id: f.id, alerta: f.vencimiento < hoy });
+  });
+  // Gastos por pagar (facturas a crédito, cuentas registradas sin pagar). Los vencidos se muestran hoy.
+  gastos.filter((g) => !g.anulado && g.pagoEstado === 'por-pagar' && g.pago?.vencimiento).forEach((g) => {
+    const f = g.pago.vencimiento < hoy ? hoy : g.pago.vencimiento;
+    if (dentro(f)) r.push({ fecha: f, hora: '', titulo: `Pagar ${g.proveedor}`, sub: `${g.folio ? `Folio ${g.folio} · ` : ''}${pesos(g.total)}`, clase: CLASE_ORIGEN.pago, origen: 'gasto', id: g.id, gasto: g, alerta: g.pago.vencimiento < hoy });
+  });
+  // Cuentas que se repiten: cada período sin registrar. Las atrasadas (desde que se creó el recurrente) se muestran hoy.
+  recurrentesActivos().forEach((x) => {
+    const desdeYM = (x.creadoMes && x.creadoMes > x.inicio ? x.creadoMes : x.inicio);
+    periodos(x, desdeYM < desde.slice(0, 7) ? desdeYM : desde.slice(0, 7), hasta.slice(0, 7)).forEach((per) => {
+      const reg = registro(x, per);
+      const venc = vencimientoDe(x, per);
+      if (reg) {
+        if (dentro(venc) && reg.estado === 'pagado') r.push({ fecha: venc, hora: '', titulo: `Pagar ${x.nombre}`, sub: 'Pagado', clase: CLASE_ORIGEN.pago, origen: 'recurrente', id: x.id, periodo: per, hecho: true });
+        return; // si quedó por pagar, ya aparece como gasto por pagar
+      }
+      const f = venc < hoy ? hoy : venc;
+      if (dentro(f)) r.push({ fecha: f, hora: '', titulo: `Pagar ${x.nombre}`, sub: x.montoEstimado ? `Alrededor de ${pesos(x.montoEstimado)}` : 'Cuenta del mes', clase: CLASE_ORIGEN.pago, origen: 'recurrente', id: x.id, periodo: per, alerta: venc < hoy });
+    });
   });
   return r.sort((a, b) => a.fecha.localeCompare(b.fecha) || (a.hora || '99').localeCompare(b.hora || '99') || a.titulo.localeCompare(b.titulo, 'es'));
 }

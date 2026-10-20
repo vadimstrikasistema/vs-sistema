@@ -804,6 +804,7 @@ a.btn { text-decoration: none; }
 .ag-clase { --ag: var(--celadon); --ag-fondo: var(--celadon-claro); --ag-tinta: var(--celadon-osc); }
 .ag-quema { --ag: #B86F4B; --ag-fondo: #F7E9E1; --ag-tinta: #7D4026; }
 .ag-cobro { --ag: var(--rosa); --ag-fondo: var(--rosa-claro); --ag-tinta: var(--rosa-osc); }
+.ag-pago { --ag: var(--carbon); --ag-fondo: #ECE7E0; --ag-tinta: var(--carbon); }
 .ag-otro { --ag: var(--tinta-tenue); --ag-fondo: var(--loza); --ag-tinta: var(--tinta-suave); }
 .ag-barra { align-items: center; }
 .ag-mes { margin: 0 0 0 6px; font-size: 1.2rem; }

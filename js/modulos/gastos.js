@@ -13,8 +13,10 @@ import {
   totalesManual, costosLineas, ivaCredito, mesDe, diasEntre, ITEM_INSUMOS, AREA_DEFECTO, sugerencia
 } from '../gastos-core.js';
 import { ICONOS } from '../iconos.js';
+import { vistaRecurrentes } from './recurrentes.js';
+import { marcarRegistro, liberarPeriodo } from '../recurrentes-core.js';
 
-const PEST = [['documentos', 'Documentos'], ['por-pagar', 'Por pagar'], ['analisis', 'Análisis'], ['alertas', 'Alertas de precio']];
+const PEST = [['documentos', 'Documentos'], ['por-pagar', 'Por pagar'], ['recurrentes', 'Recurrentes'], ['analisis', 'Análisis'], ['alertas', 'Alertas de precio']];
 const fallo = avisoError(toast);
 const TIPOS_MANUAL = [33, 34, 39, 61, 0];
 
@@ -42,6 +44,7 @@ export default {
         <p class="pagina-bajada">${{
           documentos: 'Facturas y boletas de compra. Las líneas de insumos suman stock en bodega; el resto queda como gasto general.',
           'por-pagar': 'Facturas a crédito que aún no se pagan, ordenadas por vencimiento.',
+          recurrentes: 'Cuentas que llegan cada mes o cada cierto tiempo: luz, arriendo, internet, contador.',
           analisis: 'En qué se gasta, por mes, por ítem y por área del negocio.',
           alertas: 'Insumos cuyo precio subió o bajó 10 % o más respecto de la compra anterior.'
         }[actual]}</p>
@@ -49,7 +52,7 @@ export default {
       ${pestanas('gastos', PEST, actual)}
       <div id="gas-cuerpo"></div>`;
     const c = $('#gas-cuerpo', el);
-    return ({ documentos: vistaDocumentos, 'por-pagar': vistaPorPagar, analisis: vistaAnalisis, alertas: vistaAlertas })[actual](c);
+    return ({ documentos: vistaDocumentos, 'por-pagar': vistaPorPagar, recurrentes: vistaRecurrentes, analisis: vistaAnalisis, alertas: vistaAlertas })[actual](c);
   }
 };
 
@@ -243,7 +246,7 @@ function leerLinea(div, base) {
 }
 
 // ---------------------------------------------------------------- Editor
-async function editorGasto(g = null) {
+export async function editorGasto(g = null) {
   const nuevo = !g;
   const xml = g?.origen === 'xml';
   const soloLectura = Boolean(g?.anulado);
@@ -324,7 +327,7 @@ async function editorGasto(g = null) {
         <label class="campo"><span class="campo-etiqueta">Medio de pago</span><select name="medio">${opcionesLista('mediosPago', d.pago?.medio || '', { vacio: 'Sin indicar' })}</select></label>
       </div>
       <div class="campos" data-porpagar>
-        <label class="campo"><span class="campo-etiqueta">Vencimiento ${info('Cuándo hay que pagarla. Aparece en «Por pagar» y, en la fase 4, en la Agenda.')}</span><input type="date" name="vencimiento" value="${esc(d.pago?.vencimiento || '')}"></label>
+        <label class="campo"><span class="campo-etiqueta">Vencimiento ${info('Cuándo hay que pagarla. Aparece en «Por pagar» y en la Agenda.')}</span><input type="date" name="vencimiento" value="${esc(d.pago?.vencimiento || '')}"></label>
       </div>
     </fieldset>
 
@@ -463,6 +466,8 @@ async function editorGasto(g = null) {
         if (!r?.valor) return;
         const lote = nuevoLote();
         anularGasto(lote, d, r.datos.motivo || '');
+        // Si era el gasto de una cuenta recurrente, ese período vuelve a quedar pendiente.
+        if (d.recurrenteId && estado.recurrentes[d.recurrenteId]) liberarPeriodo(lote, estado.recurrentes[d.recurrenteId], d.periodo);
         enviar(lote.commit(), { alGuardar: avisoGuardado(toast, 'Gasto anulado'), alFallar: fallo });
         cerrar();
       });
@@ -578,7 +583,7 @@ function vistaPorPagar(el) {
   return des;
 }
 
-async function marcarPagado(g) {
+export async function marcarPagado(g) {
   await formulario({
     titulo: `Pagar ${etiquetaDoc(g).toLowerCase()} de ${g.proveedor}`,
     cuerpo: `
@@ -591,6 +596,8 @@ async function marcarPagado(g) {
     guardar(form) {
       const lote = nuevoLote();
       lote.update(refDoc('gastos', g.id), { pagoEstado: 'pagado', pago: { ...g.pago, fecha: form.fecha.value || hoyISO(), medio: form.medio.value }, ...firma() });
+      const r = g.recurrenteId && estado.recurrentes[g.recurrenteId];
+      if (r && r.registros?.[g.periodo]) marcarRegistro(lote, r, g.periodo, { ...r.registros[g.periodo], estado: 'pagado' });
       enviar(lote.commit(), { alGuardar: avisoGuardado(toast, 'Marcado como pagado'), alFallar: fallo });
       return null;
     }

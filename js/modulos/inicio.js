@@ -75,7 +75,7 @@ function gastos() {
 // Lo que viene en la semana, desde la Agenda.
 function semana() {
   const hoy = hoyISO();
-  const its = itemsAgenda(hoy, sumar(hoy, 6), { facturas: resumenGastos.porCobrar }).filter((it) => !(it.origen === 'evento' && it.hecho) && !(it.origen === 'feria' && it.hecho));
+  const its = itemsAgenda(hoy, sumar(hoy, 6), { facturas: resumenGastos.porCobrar, gastos: resumenGastos.porPagar }).filter((it) => !(it.origen === 'evento' && it.hecho) && !(it.origen === 'feria' && it.hecho));
   if (!its.length) return '';
   const dia = (iso) => { const d = Math.round((new Date(`${iso}T12:00`) - new Date(`${hoy}T12:00`)) / 86400000); return d === 0 ? 'Hoy' : d === 1 ? 'Mañana' : new Date(`${iso}T12:00`).toLocaleDateString('es-CL', { weekday: 'short', day: 'numeric' }); };
   return `
@@ -212,9 +212,9 @@ export default {
             <li class="fase-hecha"><strong>Base</strong><span>Acceso, configuración y listas.</span></li>
             <li class="fase-hecha"><strong>Producción, inventario y gastos</strong><span>Insumos, recetas y bodega; gastos con XML o a mano que suman stock; piezas, lotes por etapa con mermas y quemas.</span></li>
             <li class="fase-hecha"><strong>Ventas y cobranza</strong><span>Clientes y cobranza; venta rápida, ferias y análisis; órdenes de venta, consignación y facturación en el SII.</span></li>
-            <li class="fase-hecha"><strong>Agenda y encargos</strong><span>Calendario con entregas, ferias, clases, quemas y vencimientos de cobro; encargos con abono.</span></li>
+            <li class="fase-hecha"><strong>Agenda y encargos</strong><span>Calendario con entregas, ferias, clases, quemas, cobros y pagos; encargos con abono; cuentas recurrentes.</span></li>
             <li class="fase-actual"><strong>Inventario de piezas</strong><span>Conteo de piezas en enero; con eso se puede encender el control de stock.</span></li>
-            <li><strong>Lo que sigue</strong><span>Gastos recurrentes y por pagar en la agenda, clases con alumnos, contactos de feria con QR.</span></li>
+            <li><strong>Lo que sigue</strong><span>Clases con alumnos, modo feria y contactos de feria con QR.</span></li>
           </ol>
         </section>`;
     };
