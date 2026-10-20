@@ -1,7 +1,7 @@
 // Inicio: saludo, estado de la conexión y primeros pasos para dejar lista la base.
 import { estado, alCambiar } from '../datos.js';
-import { esc, fechaLarga, numero } from '../ui.js';
-import { insumosActivos, bajoMinimo } from '../stock.js';
+import { esc, fechaLarga, numero, pesos, hoyISO } from '../ui.js';
+import { insumosActivos, bajoMinimo, escucharDonde } from '../stock.js';
 import { nombreUnidad } from '../comunes.js';
 
 function saludo() {
@@ -46,6 +46,28 @@ function pasos() {
       ir: '#/inventario/bodega'
     }
   ];
+}
+
+// Resumen de gastos: se escucha mientras Inicio está abierto.
+const resumenGastos = { porClasificar: [], porPagar: [], alertas: [] };
+function gastos() {
+  const pend = resumenGastos.porClasificar.filter((g) => !g.anulado);
+  const pp = resumenGastos.porPagar.filter((g) => !g.anulado);
+  const hoy = hoyISO();
+  const vencidas = pp.filter((g) => g.pago?.vencimiento && g.pago.vencimiento < hoy);
+  const alertas = resumenGastos.alertas;
+  if (!pend.length && !pp.length && !alertas.length) return '';
+  const item = (n, texto, href, alerta = false) => `<li><a href="${href}">${texto}</a><span class="${alerta ? 'texto-alerta' : ''}">${n}</span></li>`;
+  return `
+        <section class="panel">
+          <div class="panel-cabecera"><h2>Gastos</h2><a href="#/gastos/documentos" class="enlace-chico">Ver gastos</a></div>
+          <ul class="lista-bajos">
+            ${pend.length ? item(pend.length, 'Documentos por clasificar', '#/gastos/documentos', true) : ''}
+            ${pp.length ? item(pesos(pp.reduce((s, g) => s + (g.total || 0), 0)), `Por pagar (${pp.length})`, '#/gastos/por-pagar') : ''}
+            ${vencidas.length ? item(pesos(vencidas.reduce((s, g) => s + (g.total || 0), 0)), `Vencido (${vencidas.length})`, '#/gastos/por-pagar', true) : ''}
+            ${alertas.length ? item(alertas.length, 'Alertas de precio sin revisar', '#/gastos/alertas', true) : ''}
+          </ul>
+        </section>`;
 }
 
 function bodega() {
@@ -106,19 +128,27 @@ export default {
           </ol>
         </section>
 
+        ${gastos()}
+
         ${bodega()}
 
         <section class="panel">
           <h2>Cómo sigue el sistema</h2>
           <ol class="fases">
             <li class="fase-hecha"><strong>Base</strong><span>Acceso, configuración y listas.</span></li>
-            <li class="fase-actual"><strong>Producción, inventario y gastos</strong><span>Ya están insumos, recetas y bodega (2a). Siguen gastos con XML o a mano que suman stock (2b), y piezas, quemas y lotes por etapa con mermas (2c).</span></li>
+            <li class="fase-actual"><strong>Producción, inventario y gastos</strong><span>Ya están insumos, recetas y bodega (2a) y gastos con XML o a mano que suman stock (2b). Siguen piezas, quemas y lotes por etapa con mermas (2c).</span></li>
             <li><strong>Ventas y cobranza</strong><span>Venta rápida y ferias, clientes, consignaciones, órdenes de venta, facturación en el SII y cobros.</span></li>
             <li><strong>Agenda y clases</strong><span>Calendario de quemas, ferias, clases, entregas y compromisos de pago.</span></li>
           </ol>
         </section>`;
     };
     pintar();
-    return alCambiar(pintar);
+    const des = [
+      alCambiar(pintar),
+      escucharDonde('gastos', 'estado', '==', 'por-clasificar', (l) => { resumenGastos.porClasificar = l; pintar(); }),
+      escucharDonde('gastos', 'pagoEstado', '==', 'por-pagar', (l) => { resumenGastos.porPagar = l; pintar(); }),
+      escucharDonde('alertasPrecio', 'visto', '==', false, (l) => { resumenGastos.alertas = l; pintar(); })
+    ];
+    return () => des.forEach((u) => u());
   }
 };

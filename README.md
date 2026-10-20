@@ -7,7 +7,7 @@ Sistema de gestión del taller de cerámica Vadim Strika: producción por etapas
 - **Datos:** Firebase Firestore (plan gratuito Spark), con caché local para trabajar sin señal.
 - **Acceso:** Firebase Authentication con correo y contraseña, más una lista de correos permitidos.
 
-Versión actual: **0.2.0** (Fase 2, entrega 2a: insumos, recetas y bodega).
+Versión actual: **0.3.0** (Fase 2, entrega 2b: gastos).
 
 ---
 
@@ -83,6 +83,10 @@ Estas decisiones se respetan en todas las fases:
 - **Stock de insumos:** cada insumo guarda su `stock` y su `valorStock`, que se actualizan con cada movimiento en el mismo lote de escritura (funciona sin señal). Las salidas salen a costo promedio, para que el valor de la bodega cuadre; las recetas y piezas se costean con el método elegido en Configuración.
 - **Inventario inicial, ajustes y conteos no son gastos.** Solo corrigen cuánto hay y lo que vale. Las compras con documento entran por Gastos (entrega 2b).
 - **Recetas por porcentaje:** la base suma 100 % y las adiciones (colorantes, opacificantes) van sobre la base. Lo preparado entra a bodega como un insumo elaborado con el nombre de la receta. Editar una receta no cambia las preparaciones anteriores.
+- **Gastos:** un XML cargado queda «por clasificar» y no mueve stock hasta que se clasifica cada línea. Insumo a bodega suma stock según el formato («2 sacos de 25 kg» = 50 kg) al costo neto en facturas o total pagado en boletas; los descuentos globales se reparten en las líneas. Gasto general lleva ítem y área.
+- **Duplicados:** mismo RUT + tipo + folio no se vuelve a ingresar. Mismo RUT y monto, otro folio y fecha a 7 días o menos se marca como posible duplicado.
+- **Aprendizaje:** la app recuerda cómo se clasificó cada producto de cada proveedor y lo sugiere la próxima vez. Cuando todas las líneas de una factura ya se clasificaron igual dos veces, se clasifica sola y queda marcada para revisar.
+- **Alertas de precio:** si un insumo llega 10 % más caro o más barato que la última vez, se crea una alerta con las recetas que lo usan.
 - **Movimientos inmutables:** las reglas de Firestore no dejan cambiar un movimiento; solo marcarlo como anulado, y la anulación crea el movimiento contrario.
 
 ## Estructura de datos
@@ -98,6 +102,9 @@ Estas decisiones se respetan en todas las fases:
 | `movimientos` | uno por entrada o salida | `fecha`, `tipo` (inicial, ajuste, conteo, preparacion, compra, anulacion), `insumoId`, `cantidad` con signo, `costoUnitario`, `valor`, `motivo`, `ref` al documento que lo originó, `anulado` |
 | `preparaciones` | una por vez que se prepara una receta | receta, base seca, ingredientes pesados con su costo, cantidad resultante, costo unitario y los movimientos que generó |
 | `conteos` | uno por conteo físico | fecha, lo contado y la diferencia por insumo |
+| `gastos` | uno por factura, boleta o gasto sin documento | `origen` (xml o manual), `tipoDoc` (33, 34, 39, 61, 0…), `folio`, `fecha`, `mes`, `rutProveedor`, `rutLimpio`, `proveedor`, `neto`, `exento`, `iva`, `total`, `lineas[]` con su clase (`insumo` con `insumoId` y `factor`, o `gasto` con `itemGasto` y `area`), `estado` (por-clasificar o clasificado), `pagoEstado`, `pago`, `movs` (stock que generó), `automatico`, `revisado`, `anulado` |
+| `proveedores` | uno por RUT (sin puntos) | nombre, giro y lo aprendido: `items` (cómo se clasificó cada producto y cuántas veces igual) y `defecto` para líneas nuevas |
+| `alertasPrecio` | una por cambio de precio de 10 % o más | insumo, costo anterior y nuevo, variación, proveedor, documento, recetas afectadas, `visto` |
 
 Listas iniciales: tipos de insumo, unidades, categorías de pieza, canales de venta, medios de pago, áreas del negocio, ítems de gasto, motivos de merma y motivos de ajuste de inventario.
 
@@ -127,12 +134,24 @@ fonts/, img/            tipografías y logo (incluidos para funcionar sin señal
 1. **Base** · acceso, reglas de seguridad, Configuración y listas editables. ✔
 2. **Producción, inventario y gastos**, en tres entregas:
    - **2a** · insumos con formatos de compra y calculadora de costo, recetas de esmaltes, engobes y pastas por porcentaje, preparación que descuenta y suma stock, bodega con inventario inicial, ajustes, conteo físico e historial. ✔
-   - **2b** · gastos con XML del SII o a mano; cada línea como insumo (suma stock) o gasto general, con aprendizaje por proveedor, duplicados y alertas de precio.
+   - **2b** · gastos con XML del SII o a mano; cada línea como insumo (suma stock) o gasto general, con aprendizaje por proveedor, duplicados, alertas de precio, por pagar y análisis mensual. ✔ Pendiente para más adelante: conciliación con la cartola del banco, cuentas recurrentes y foto de boletas.
    - **2c** · fichas de pieza (pasta, esmalte, horas, tamaño S, M, L, XL en el horno), quemas con horno eléctrico o a gas, lotes por etapa con mermas, piezas de segunda, inventario de piezas.
 3. **Ventas y cobranza** · venta rápida y ferias, clientes, consignaciones con liquidación, órdenes de venta con PDF y WhatsApp, por facturar con el favorito que rellena el facturador del SII, encargos con abono, cobranza y pagos.
 4. **Agenda y clases** · calendario con quemas, ferias, clases, entregas y compromisos de pago.
 
 ## Historial de versiones
+
+### 0.3.0 · Fase 2, entrega 2b: gastos
+- **Gastos → Documentos:** carga de XML del SII (uno o varios archivos, con varias facturas cada uno, en ISO-8859-1 o UTF-8), arrastrando o eligiendo archivos. Detecta facturas ya ingresadas, posibles duplicados, facturas emitidas por la propia empresa y facturas a otro RUT.
+- **Clasificación por línea:** insumo a bodega (con su formato de compra y el costo resultante) o gasto general (ítem y área), con «aplicar a todas». Muestra el alza o baja de precio antes de guardar.
+- **Gasto a mano:** factura, factura exenta, boleta, nota de crédito o sin documento; RUT, proveedor y folio obligatorios con documento; completa el proveedor si el RUT ya es conocido.
+- **Aprendizaje por proveedor** y clasificación automática para revisar.
+- **Por pagar:** facturas a crédito por vencimiento, con vencidas y próximas 7 días, y «Marcar pagado».
+- **Análisis:** gasto del mes, compras a bodega, gastos generales, IVA crédito fiscal, por ítem, por área y últimos seis meses.
+- **Alertas de precio** con recetas afectadas.
+- **Inicio:** documentos por clasificar, por pagar, vencido y alertas sin revisar.
+- **Reglas de Firestore nuevas** para gastos, proveedores y alertas de precio. **Hay que volver a publicarlas.**
+- Estructura de datos versión 3 (se actualiza sola al entrar).
 
 ### 0.2.0 · Fase 2, entrega 2a: insumos, recetas y bodega
 - **Producción → Insumos:** catálogo por tipo con búsqueda, unidad, stock mínimo, formatos de compra, costo de referencia con calculadora (precio ÷ contenido) y archivo.

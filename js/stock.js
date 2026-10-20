@@ -7,7 +7,7 @@
 // de escritura que el movimiento. `increment` funciona sin señal.
 import {
   db, collection, doc, writeBatch, serverTimestamp, increment,
-  query, where, orderBy, limit, getDocs
+  query, where, orderBy, limit, getDocs, onSnapshot
 } from './firebase.js';
 import { estado, firma } from './datos.js';
 
@@ -159,3 +159,27 @@ export async function documentosPorCampo(coleccion, campo, valor) {
 
 export const refNueva = (coleccion) => doc(collection(db, coleccion));
 export const refDoc = (coleccion, id) => doc(db, coleccion, id);
+
+// Escucha en vivo los documentos de una colección que cumplen campo == valor
+// (o campo op valor). Devuelve la función para dejar de escuchar.
+export function escucharDonde(coleccion, campo, op, valor, alRecibir) {
+  return onSnapshot(query(collection(db, coleccion), where(campo, op, valor)), (qs) => {
+    const lista = [];
+    qs.forEach((d) => lista.push({ id: d.id, ...d.data() }));
+    alRecibir(lista);
+  }, (e) => console.error('Error al escuchar', coleccion, e));
+}
+
+export async function documentosDonde(coleccion, campo, op, valor) {
+  const qs = await getDocs(query(collection(db, coleccion), where(campo, op, valor)));
+  const lista = [];
+  qs.forEach((d) => lista.push({ id: d.id, ...d.data() }));
+  return lista;
+}
+
+export async function ultimosDocumentos(coleccion, n = 50) {
+  const qs = await getDocs(query(collection(db, coleccion), orderBy('creadoMs', 'desc'), limit(n)));
+  const lista = [];
+  qs.forEach((d) => lista.push({ id: d.id, ...d.data() }));
+  return lista;
+}

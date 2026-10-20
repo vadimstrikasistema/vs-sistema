@@ -90,13 +90,39 @@ service cloud.firestore {
       allow update, delete: if false;
     }
 
+    // Gastos: se editan (clasificar, pagar) y se anulan; nunca se borran.
+    match /gastos/{id} {
+      allow read: if permitido();
+      allow create, update: if permitido() && firmado()
+        && request.resource.data.lineas is list
+        && request.resource.data.tipoDoc is number;
+      allow delete: if false;
+    }
+
+    // Proveedores: datos y lo aprendido de sus facturas, por RUT.
+    match /proveedores/{rut} {
+      allow read: if permitido();
+      allow create, update: if permitido() && firmado();
+      allow delete: if false;
+    }
+
+    // Alertas de precio: se crean al clasificar; después solo se marcan como vistas.
+    match /alertasPrecio/{id} {
+      allow read: if permitido();
+      allow create: if permitido() && firmado();
+      allow update: if permitido() && firmado()
+        && request.resource.data.diff(resource.data).affectedKeys()
+             .hasOnly(['visto', 'actualizado', 'actualizadoPor']);
+      allow delete: if false;
+    }
+
     // Colecciones de las fases siguientes (insumos, piezas, ventas, gastos…).
     // Se leen y escriben solo con permiso; nunca se borran.
     // (Excluye las colecciones de arriba para no saltarse sus reglas:
     // en Firestore basta que una regla permita para que se permita.)
     match /{coleccion}/{docId} {
       allow read: if permitido();
-      allow create, update: if permitido() && !(coleccion in ['config', 'listas', 'insumos', 'recetas', 'movimientos', 'preparaciones', 'conteos']);
+      allow create, update: if permitido() && !(coleccion in ['config', 'listas', 'insumos', 'recetas', 'movimientos', 'preparaciones', 'conteos', 'gastos', 'proveedores', 'alertasPrecio']);
       allow delete: if false;
     }
   }

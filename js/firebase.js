@@ -17,6 +17,8 @@ auth.languageCode = 'es';
 let db;
 try {
   db = fsMod.initializeFirestore(app, {
+    // Un campo sin valor (undefined) se omite en vez de hacer fallar la escritura.
+    ignoreUndefinedProperties: true,
     localCache: fsMod.persistentLocalCache({
       tabManager: fsMod.persistentMultipleTabManager()
     })

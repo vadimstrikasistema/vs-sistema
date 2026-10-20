@@ -13,6 +13,7 @@ export const estado = {
   listas: {},       // clave → { nombre, descripcion, items[] }
   insumos: {},      // id → insumo (incluye su stock y valor guardados)
   recetas: {},      // id → receta
+  proveedores: {},  // rut sin puntos → proveedor, con lo aprendido de sus facturas
   listo: false
 };
 
@@ -84,6 +85,12 @@ export function escuchar() {
     const m = {};
     qs.forEach((d) => { m[d.id] = { id: d.id, ...d.data() }; });
     estado.insumos = m;
+    avisar();
+  }, errorEscucha));
+  desuscribir.push(onSnapshot(collection(db, 'proveedores'), (qs) => {
+    const m = {};
+    qs.forEach((d) => { m[d.id] = { id: d.id, ...d.data() }; });
+    estado.proveedores = m;
     avisar();
   }, errorEscucha));
   desuscribir.push(onSnapshot(collection(db, 'recetas'), (qs) => {

@@ -23,10 +23,7 @@ const MODULOS = [
   } },
   { clave: 'produccion', titulo: 'Producción', carga: () => import('./modulos/produccion.js') },
   { clave: 'inventario', titulo: 'Inventario', carga: () => import('./modulos/inventario.js') },
-  { clave: 'gastos', titulo: 'Gastos', pendiente: {
-    fase: '2b', resumen: 'Compras y gastos, a mano o desde el XML del SII. Las compras de insumos suman stock solas.',
-    puntos: ['Carga de XML de facturas de compra, en lote', 'Ingreso a mano con RUT y folio, y gastos sin documento', 'Cada línea como insumo (suma stock) o gasto general', 'El sistema aprende qué insumo es cada producto de cada proveedor', 'Detección de facturas duplicadas y alertas de precio', 'Por pagar, cuentas recurrentes y análisis por área']
-  } },
+  { clave: 'gastos', titulo: 'Gastos', carga: () => import('./modulos/gastos.js') },
   { clave: 'configuracion', titulo: 'Configuración', carga: () => import('./modulos/configuracion.js') }
 ];
 const EN_BARRA_MOVIL = ['inicio', 'ventas', 'produccion', 'inventario'];

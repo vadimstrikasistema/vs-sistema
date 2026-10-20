@@ -1,14 +1,14 @@
 // Service worker: guarda la app en el equipo para que abra sin señal.
 // Los datos no pasan por aquí: los maneja la caché de Firestore.
 // Al publicar una versión nueva, cambia VERSION para que los equipos la descarguen.
-const VERSION = 'vs-0.2.0';
+const VERSION = 'vs-0.3.0';
 
 const ARCHIVOS = [
   './',
   'index.html',
   'manifest.webmanifest',
-  'css/app.css?v=0.2.0',
-  'js/app.js?v=0.2.0',
+  'css/app.css?v=0.3.0',
+  'js/app.js?v=0.3.0',
   'js/config.js',
   'js/firebase.js',
   'js/datos.js',
@@ -22,6 +22,9 @@ const ARCHIVOS = [
   'js/modulos/inventario.js',
   'js/stock.js',
   'js/comunes.js',
+  'js/xml-sii.js',
+  'js/gastos-core.js',
+  'js/modulos/gastos.js',
   'img/logo-negro.svg',
   'img/moteado.svg',
   'img/icono.svg',
