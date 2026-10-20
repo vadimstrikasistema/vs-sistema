@@ -1,14 +1,14 @@
 // Service worker: guarda la app en el equipo para que abra sin señal.
 // Los datos no pasan por aquí: los maneja la caché de Firestore.
 // Al publicar una versión nueva, cambia VERSION para que los equipos la descarguen.
-const VERSION = 'vs-0.1.0';
+const VERSION = 'vs-0.1.1';
 
 const ARCHIVOS = [
   './',
   'index.html',
   'manifest.webmanifest',
-  'css/app.css?v=0.1.0',
-  'js/app.js?v=0.1.0',
+  'css/app.css?v=0.1.1',
+  'js/app.js?v=0.1.1',
   'js/config.js',
   'js/firebase.js',
   'js/datos.js',
@@ -19,14 +19,12 @@ const ARCHIVOS = [
   'js/modulos/configuracion.js',
   'js/modulos/pendiente.js',
   'img/logo-negro.svg',
-  'img/logo-blanco.svg',
   'img/moteado.svg',
   'img/icono.svg',
   'img/icono-192.png',
   'fonts/instrument-sans-400.woff2',
   'fonts/instrument-sans-500.woff2',
-  'fonts/instrument-sans-600.woff2',
-  'fonts/young-serif-400.woff2'
+  'fonts/instrument-sans-600.woff2'
 ];
 
 self.addEventListener('install', (e) => {

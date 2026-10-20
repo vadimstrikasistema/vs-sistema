@@ -7,7 +7,7 @@ Sistema de gestión del taller de cerámica Vadim Strika: producción por etapas
 - **Datos:** Firebase Firestore (plan gratuito Spark), con caché local para trabajar sin señal.
 - **Acceso:** Firebase Authentication con correo y contraseña, más una lista de correos permitidos.
 
-Versión actual: **0.1.0** (Fase 1, base).
+Versión actual: **0.1.1** (Fase 1, base).
 
 ---
 
@@ -121,6 +121,11 @@ fonts/, img/            tipografías y logo (incluidos para funcionar sin señal
 4. **Agenda y clases** · calendario con quemas, ferias, clases, entregas y compromisos de pago.
 
 ## Historial de versiones
+
+### 0.1.1 · Ajustes de diseño
+- Tipografía única, Instrument Sans, más limpia.
+- Paleta reducida: cobalto para acciones, rosa esmalte en el menú con selector claro, ocre gres y celadón de apoyo, fondos blanco y loza; carbón solo en el texto.
+- Ícono de la app en cobalto.
 
 ### 0.1.0 · Fase 1, base
 - Ingreso con correo y contraseña, lista de correos permitidos y recuperación de contraseña.

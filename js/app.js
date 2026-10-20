@@ -120,7 +120,7 @@ function pantallaApp(usuario) {
     <div class="marco">
       <aside class="lateral" aria-label="Menú principal">
         <a href="#/inicio" class="lateral-marca">
-          <img src="img/logo-blanco.svg" alt="" width="34" height="40">
+          <img src="img/logo-negro.svg" alt="" width="34" height="40">
           <span>Vadim Strika</span>
         </a>
         <nav class="lateral-nav">${MODULOS.map(enlace).join('')}</nav>
