@@ -1,0 +1,16 @@
+{
+  "name": "Vadim Strika · Sistema del taller",
+  "short_name": "Vadim Strika",
+  "description": "Sistema de gestión del taller de cerámica Vadim Strika.",
+  "lang": "es-CL",
+  "start_url": "./#/inicio",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#F4EFE7",
+  "theme_color": "#1C1A17",
+  "icons": [
+    { "src": "img/icono-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
+    { "src": "img/icono-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" },
+    { "src": "img/icono.svg", "sizes": "any", "type": "image/svg+xml" }
+  ]
+}

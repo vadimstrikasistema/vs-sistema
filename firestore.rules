@@ -1,0 +1,53 @@
+rules_version = '2';
+
+// Reglas de seguridad del sistema Vadim Strika.
+// Se copian en Firebase → Firestore Database → Reglas → Publicar.
+//
+// 1. Solo entran los correos de la lista (los mismos de js/config.js).
+// 2. Nada se borra: ninguna colección permite eliminar documentos.
+//    Lo que deja de usarse se archiva, se oculta o se anula desde la app.
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function permitido() {
+      return request.auth != null
+        && request.auth.token.email.lower() in [
+          'megustalacomidadelosaviones@gmail.com',
+          'vadimstrikasistema@gmail.com'
+        ];
+    }
+
+    // Toda escritura debe dejar registro de quién la hizo.
+    function firmado() {
+      return request.resource.data.actualizadoPor == request.auth.token.email;
+    }
+
+    // Configuración: empresa, costeo y versión del sistema.
+    match /config/{docId} {
+      allow read: if permitido();
+      allow create, update: if permitido() && firmado()
+        && docId in ['sistema', 'empresa', 'costeo'];
+      allow delete: if false;
+    }
+
+    // Listas editables: siempre deben conservar su arreglo de ítems.
+    match /listas/{clave} {
+      allow read: if permitido();
+      allow create, update: if permitido() && firmado()
+        && request.resource.data.items is list
+        && request.resource.data.items.size() <= 300;
+      allow delete: if false;
+    }
+
+    // Colecciones de las fases siguientes (insumos, piezas, ventas, gastos…).
+    // Se leen y escriben solo con permiso; nunca se borran.
+    // (Excluye config y listas para no saltarse sus reglas de arriba:
+    // en Firestore basta que una regla permita para que se permita.)
+    match /{coleccion}/{docId} {
+      allow read: if permitido();
+      allow create, update: if permitido() && !(coleccion in ['config', 'listas']);
+      allow delete: if false;
+    }
+  }
+}
