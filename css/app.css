@@ -1,6 +1,6 @@
 /* Vadim Strika · sistema del taller
    Paleta corta sacada de las piezas: cobalto (el azul moteado) como color de acción,
-   rosa esmalte para la navegación, ocre gres y celadón como apoyo, blanco y loza de fondo.
+   un loza más oscuro para la navegación, rosa esmalte para avisos, ocre gres y celadón como apoyo, blanco y loza de fondo.
    El carbón queda solo para el texto. */
 
 @font-face { font-family: 'Instrument Sans'; src: url('../fonts/instrument-sans-400.woff2') format('woff2'); font-weight: 400; font-display: swap; }
@@ -26,10 +26,12 @@
   --celadon-osc: #46623F;
   --celadon-claro: #E6EDE3;
   --rosa: #C48A8F;
-  --rosa-hover: #CE9A9E;
-  --rosa-tinta: #3A2326;
-  --rosa-selector: #F4E4E5;
   --rosa-osc: #8C4A52;
+  --menu: #E8E0D3;
+  --menu-hover: #DED4C5;
+  --menu-borde: #D9CFBF;
+  --menu-tinta: #3A352F;
+  --menu-selector: #FFFFFF;
   --rosa-claro: #F5E6E6;
 
   --sans: 'Instrument Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
@@ -168,14 +170,14 @@ body.modo-login { background: var(--loza); }
   position: fixed; inset: auto 0 0 0; z-index: 30;
   display: grid; grid-template-columns: repeat(5, 1fr);
   height: calc(var(--barra-inf) + var(--seguro-inf)); padding-bottom: var(--seguro-inf);
-  background: var(--rosa);
+  background: var(--menu); border-top: 1px solid var(--menu-borde);
 }
 .barra-inferior .nav-item {
   display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px;
-  background: none; border: 0; color: var(--rosa-tinta); text-decoration: none; font-size: 0.7rem; font-weight: 500; cursor: pointer;
+  background: none; border: 0; color: var(--menu-tinta); text-decoration: none; font-size: 0.7rem; font-weight: 500; cursor: pointer;
 }
 .barra-inferior .nav-item { margin: 6px 3px; border-radius: 12px; }
-.barra-inferior .nav-item.activo { background: var(--rosa-selector); color: var(--rosa-osc); font-weight: 600; }
+.barra-inferior .nav-item.activo { background: var(--menu-selector); color: var(--cobalto); font-weight: 600; }
 
 .conexion { display: inline-flex; align-items: center; gap: 6px; font-size: 0.78rem; font-weight: 500; }
 .conexion svg { width: 18px; height: 18px; }
@@ -204,21 +206,22 @@ body.modo-login { background: var(--loza); }
   .lateral {
     position: fixed; inset: 0 auto 0 0; width: var(--lateral); z-index: 20;
     display: flex; flex-direction: column;
-    padding: 22px 14px 18px; background: var(--rosa); color: var(--rosa-tinta);
+    padding: 22px 14px 18px; background: var(--menu); color: var(--menu-tinta); border-right: 1px solid var(--menu-borde);
   }
-  .lateral-marca { display: flex; align-items: center; gap: 12px; padding: 0 10px 26px; color: var(--rosa-tinta); text-decoration: none; font-weight: 600; font-size: 1.08rem; letter-spacing: -0.01em; }
+  .lateral-marca { display: flex; align-items: center; gap: 12px; padding: 0 10px 26px; color: var(--menu-tinta); text-decoration: none; font-weight: 600; font-size: 1.08rem; letter-spacing: -0.01em; }
   .lateral-nav { display: flex; flex-direction: column; gap: 2px; flex: 1; }
   .lateral-nav .nav-item {
     display: flex; align-items: center; gap: 12px; min-height: 42px; padding: 0 12px;
-    border-radius: var(--r-chico); color: var(--rosa-tinta); text-decoration: none; font-weight: 500; font-size: 0.95rem;
+    border-radius: var(--r-chico); color: var(--menu-tinta); text-decoration: none; font-weight: 500; font-size: 0.95rem;
   }
-  .lateral-nav .nav-item:hover { background: var(--rosa-hover); }
-  .lateral-nav .nav-item.activo { background: var(--rosa-selector); color: var(--rosa-osc); font-weight: 600; }
+  .lateral-nav .nav-item:hover { background: var(--menu-hover); }
+  .lateral-nav .nav-item.activo { background: var(--menu-selector); color: var(--cobalto); font-weight: 600; }
   .lateral-nav .nav-item:last-child { margin-top: auto; }
-  .lateral-pie { display: flex; flex-direction: column; gap: 6px; padding: 16px 12px 0; margin-top: 12px; border-top: 1px solid rgb(58 35 38 / .18); font-size: 0.8rem; }
-  .lateral-pie .conexion { color: var(--rosa-tinta); }
-  .lateral-pie .conexion.sin-linea { font-weight: 700; }
-  .lateral-usuario { color: var(--rosa-tinta); opacity: .75; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .lateral-pie { display: flex; flex-direction: column; gap: 6px; padding: 16px 12px 0; margin-top: 12px; border-top: 1px solid var(--menu-borde); font-size: 0.8rem; }
+  .lateral-pie .conexion { color: var(--menu-tinta); }
+  .lateral-pie .conexion.en-linea { color: var(--celadon-osc); }
+  .lateral-pie .conexion.sin-linea { color: var(--rosa-osc); font-weight: 700; }
+  .lateral-usuario { color: var(--menu-tinta); opacity: .75; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .contenido { margin-left: var(--lateral); padding: 44px 48px 64px; }
 }
 
