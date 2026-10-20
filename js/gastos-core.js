@@ -208,7 +208,7 @@ export async function importarArchivos(archivos) {
     for (const dte of dtes) {
       const rutLimpio = limpiarRut(dte.rutProveedor);
       const etiqueta = `${TIPOS_DTE[dte.tipoDoc] || `Documento ${dte.tipoDoc}`} ${dte.folio} de ${dte.proveedor}`;
-      if (rutEmpresa && rutLimpio === rutEmpresa) { r.noGasto.push(`${etiqueta}: lo emitió tu empresa, es una venta.`); continue; }
+      if (rutEmpresa && rutLimpio === rutEmpresa) { r.noGasto.push(`${etiqueta}: lo emitió tu empresa, es una venta. Cárgalo en Cobranza → Facturas.`); continue; }
       if (Number(dte.tipoDoc) === 52) { r.noGasto.push(`${etiqueta}: las guías de despacho no son gasto; se registra la factura.`); continue; }
       const clave = `${rutLimpio}-${dte.tipoDoc}-${dte.folio}`;
       if (vistos.has(clave)) continue;

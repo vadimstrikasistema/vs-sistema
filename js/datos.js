@@ -15,6 +15,7 @@ export const estado = {
   recetas: {},      // id → receta
   piezas: {},       // id → ficha de pieza (con su stock de terminadas)
   horno: null,      // config/horno: energía, precios, capacidad, valor hora
+  clientes: {},     // id → cliente (empresas y clientes finales)
   proveedores: {},  // rut sin puntos → proveedor, con lo aprendido de sus facturas
   listo: false
 };
@@ -93,6 +94,12 @@ export function escuchar() {
     const m = {};
     qs.forEach((d) => { m[d.id] = { id: d.id, ...d.data() }; });
     estado.piezas = m;
+    avisar();
+  }, errorEscucha));
+  desuscribir.push(onSnapshot(collection(db, 'clientes'), (qs) => {
+    const m = {};
+    qs.forEach((d) => { m[d.id] = { id: d.id, ...d.data() }; });
+    estado.clientes = m;
     avisar();
   }, errorEscucha));
   desuscribir.push(onSnapshot(collection(db, 'proveedores'), (qs) => {

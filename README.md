@@ -7,7 +7,7 @@ Sistema de gestión del taller de cerámica Vadim Strika: producción por etapas
 - **Datos:** Firebase Firestore (plan gratuito Spark), con caché local para trabajar sin señal.
 - **Acceso:** Firebase Authentication con correo y contraseña, más una lista de correos permitidos.
 
-Versión actual: **0.4.1** (Fase 2 completa, afinada con los datos del taller).
+Versión actual: **0.5.0** (Fase 3, entrega 3a: clientes y cobranza).
 
 ---
 
@@ -89,6 +89,7 @@ Estas decisiones se respetan en todas las fases:
 - **Alertas de precio:** si un insumo llega 10 % más caro o más barato que la última vez, se crea una alerta con las recetas que lo usan.
 - **Piezas y lotes:** una ficha dice con qué se hace una pieza; su costo es un estimado con los precios de hoy. Un lote es una tanda real: al crearlo descuenta la pasta y suma las horas; en el secado se anotan las grietas y la arcilla puede volver a bodega; al esmaltar descuenta el esmalte; al terminar descuenta los otros insumos (embalaje) solo por las piezas buenas y suma las piezas a stock. Las piezas que se pierden reparten su costo entre las que quedan, así el costo por pieza es el real del taller.
 - **Quemas:** se registran al abrir el horno, con los lotes que iban y lo que salió. Su costo (kWh, horas × potencia, kg de gas o costo directo; si no hay dato, el estimado) se reparte según los puntos: S 1, M 2, L 4, XL 8. Una quema registrada no se modifica.
+- **Cobranza:** cada factura emitida queda por cobrar desde su XML o a mano; si el cliente no existe se crea con los datos del XML. El vencimiento sale del XML o del plazo de pago del cliente. Un pago se reparte entre las facturas del cliente, de la más antigua a la más nueva, y puede cubrir varias o parte de una. Una nota de crédito descuenta de la factura que corrige. Los pagos solo se anulan; una factura con pagos no se puede anular hasta anular sus pagos.
 - **Movimientos inmutables:** las reglas de Firestore no dejan cambiar un movimiento; solo marcarlo como anulado, y la anulación crea el movimiento contrario.
 
 ## Estructura de datos
@@ -111,6 +112,9 @@ Estas decisiones se respetan en todas las fases:
 | `lotes` | uno por tanda de piezas | pieza, `cantidadInicial`, `cantidadActual`, `etapa` (modelado, seco, bizcochado, esmaltado, terminado), `estado`, `historial[]` de cada etapa con lo que entró, salió y se perdió (y por qué), costos acumulados (`costoPasta`, `costoEsmalte`, `costoOtros`, `costoHoras`, `costoQuemas`, `creditoReciclaje`), al terminar `primera`, `segunda`, `costoUnitario`, y los movimientos que generó |
 | `quemas` | una por quema | `tipo` (bizcocho o esmalte), fecha, cono, `energia` y `costo`, `puntos` y `ocupacion`, y por lote: piezas, puntos, costo asignado y lo que salió |
 | `movPiezas` | uno por entrada o salida de piezas terminadas | pieza, `calidad` (primera o segunda), `cantidad` con signo, costo, `tipo` (produccion, ajuste, anulacion), motivo, `anulado` |
+| `clientes` | uno por cliente | `tipo` (empresa o persona), `rut`, `rutLimpio`, `razonSocial`, `nombre` (del local), `giro`, `direccion`, `comuna`, `contacto`, `whatsapp`, `correo`, `instagram`, `condicionDias` (plazo de pago), `ultimoRecordatorio`, `notas`, `archivado` |
+| `facturas` | una por documento emitido (cuenta por cobrar) | `origen` (xml o manual), `tipoDoc` (33, 34, 61, 0 sin documento), `folio`, `fecha`, `mes`, `vencimiento`, cliente, `neto`, `iva`, `total`, `lineas`, `referencias`, `pagado`, `estado` (pendiente, parcial, pagada, anulada, nota-credito), `abierta`, `aplicadaA` en notas de crédito |
+| `pagos` | uno por pago recibido | cliente, `fecha`, `medio`, `referencia`, `monto`, `aplicaciones[]` (factura y monto), `tipo` (pago o nota-credito), `anulado` |
 | `alertasPrecio` | una por cambio de precio de 10 % o más | insumo, costo anterior y nuevo, variación, proveedor, documento, recetas afectadas, `visto` |
 
 Listas iniciales: tipos de insumo, unidades, categorías de pieza, canales de venta, medios de pago, áreas del negocio, ítems de gasto, motivos de merma y motivos de ajuste de inventario.
@@ -143,10 +147,25 @@ fonts/, img/            tipografías y logo (incluidos para funcionar sin señal
    - **2a** · insumos con formatos de compra y calculadora de costo, recetas de esmaltes, engobes y pastas por porcentaje, preparación que descuenta y suma stock, bodega con inventario inicial, ajustes, conteo físico e historial. ✔
    - **2b** · gastos con XML del SII o a mano; cada línea como insumo (suma stock) o gasto general, con aprendizaje por proveedor, duplicados, alertas de precio, por pagar y análisis mensual. ✔ Pendiente para más adelante: conciliación con la cartola del banco, cuentas recurrentes y foto de boletas.
    - **2c** · fichas de pieza (pasta, esmalte, horas, tamaño S, M, L, XL en el horno) con costo y margen, lotes por etapa con mermas y reciclaje de arcilla, quemas con horno eléctrico o a gas y costo repartido, piezas de primera y de segunda, inventario de piezas con ajustes. ✔ Pendiente: fotos de las piezas (requiere decidir dónde guardarlas) y quemas programadas en la Agenda (fase 4).
-3. **Ventas y cobranza** · venta rápida y ferias, clientes, consignaciones con liquidación, órdenes de venta con PDF y WhatsApp, por facturar con el favorito que rellena el facturador del SII, encargos con abono, cobranza y pagos.
+3. **Ventas y cobranza**, en tres entregas:
+   - **3a** · clientes y cobranza: facturas emitidas desde el XML o a mano, notas de crédito, pagos en efectivo o transferencia, recordatorios por WhatsApp y estado de cuenta en PDF. ✔
+   - **3b** · venta rápida y ferias, también sin señal, con boleta y folio; vender sin inventario cargado hasta enero.
+   - **3c** · órdenes de venta, consignaciones con liquidación y facturación con el favorito del facturador del SII, conectadas con la cobranza.
 4. **Agenda y clases** · calendario con quemas, ferias, clases, entregas y compromisos de pago.
 
 ## Historial de versiones
+
+### 0.5.0 · Fase 3, entrega 3a: clientes y cobranza
+- **Ventas → Clientes:** empresas y profesionales (RUT, razón social, nombre del local, giro, contacto, WhatsApp, plazo de pago) y clientes finales (nombre, Instagram, notas).
+- **Cobranza → Facturas:** carga de XML de facturas emitidas (crea los clientes que faltan y aplica las notas de crédito), factura a mano o deuda sin documento, detalle con sus pagos, anulación.
+- **Cobranza → Por cobrar:** total, vencido y al día; una tarjeta por cliente con sus folios y días de atraso, la más atrasada primero.
+- **Recordatorio por WhatsApp** en tono amable o firme, con los datos de transferencia y, si se quiere, el estado de cuenta en PDF. En el celular se comparte con el menú del teléfono; en el computador se descarga y se abre el chat.
+- **Registrar pago** en efectivo o transferencia, repartido solo entre las facturas del cliente, con referencia. **Cobranza → Pagos** con lo cobrado en el mes y anulación.
+- **Configuración → Empresa:** datos para transferencias.
+- **Inicio:** por cobrar y vencido. En el celular, Cobranza pasa a la barra inferior e Inventario a «Más».
+- El PDF se arma en el teléfono o el computador con jsPDF (`js/vendor`), sin servidor y sin señal.
+- **Reglas de Firestore nuevas** para clientes, facturas y pagos. **Hay que volver a publicarlas.**
+- Estructura de datos versión 5.
 
 ### 0.4.1 · Ajustes con los datos del taller
 - Varios hornos (parte con tres eléctricos, 278 kWh por bizcocho y 558 kWh por esmalte), cada uno con su nombre, consumo promedio y capacidad.

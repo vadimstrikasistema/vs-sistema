@@ -53,7 +53,8 @@ const CAMPOS_EMPRESA = [
   ['correo', 'Correo de contacto', 'email', null],
   ['telefono', 'Teléfono', 'tel', null],
   ['whatsapp', 'WhatsApp', 'tel', 'Con código de país, por ejemplo +56 9 1234 5678. Se usa para el botón de WhatsApp en los PDF.'],
-  ['instagram', 'Instagram', 'text', 'Solo el usuario, sin @.']
+  ['instagram', 'Instagram', 'text', 'Solo el usuario, sin @.'],
+  ['datosTransferencia', 'Datos para transferencias', 'text', 'Banco, tipo y número de cuenta, RUT y correo. Se incluyen en los recordatorios de cobranza y en el estado de cuenta, para que el cliente pague sin preguntar.']
 ];
 
 function empresa(el) {
@@ -66,7 +67,7 @@ function empresa(el) {
         <h2>Datos de la empresa</h2>
         <div class="campos">
           ${CAMPOS_EMPRESA.map(([k, l, t, ayuda]) => `
-            <label class="campo ${['direccion', 'giro', 'razonSocial'].includes(k) ? 'campo-ancho' : ''}">
+            <label class="campo ${['direccion', 'giro', 'razonSocial', 'datosTransferencia'].includes(k) ? 'campo-ancho' : ''}">
               <span class="campo-etiqueta">${esc(l)} ${ayuda ? info(ayuda) : ''}</span>
               <input name="${k}" type="${t}" value="${esc(e[k] || '')}" autocomplete="off" ${k === 'rut' ? 'inputmode="text" placeholder="12.345.678-9"' : ''}>
               ${k === 'rut' ? '<small class="campo-error" id="rut-error" hidden>El RUT no es válido. Revisa el dígito verificador.</small>' : ''}

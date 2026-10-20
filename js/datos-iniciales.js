@@ -90,7 +90,8 @@ export const EMPRESA_INICIAL = {
   correo: '',
   telefono: '',
   whatsapp: '',
-  instagram: 'vadim_strika'
+  instagram: 'vadim_strika',
+  datosTransferencia: ''
 };
 
 export const COSTEO_INICIAL = {

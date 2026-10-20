@@ -13,20 +13,14 @@ const MODULOS = [
     fase: 4, resumen: 'Todo lo que tiene fecha en el taller, en un solo calendario.',
     puntos: ['Quemas programadas y qué lotes llevan', 'Ferias con días, horario y costo del puesto', 'Clases y talleres con sus sesiones', 'Entregas de encargos y compromisos de pago', 'Copia opcional a Google Calendar']
   } },
-  { clave: 'ventas', titulo: 'Ventas', pendiente: {
-    fase: 3, resumen: 'Venta directa, ferias y ventas a empresas, hasta dejar la factura lista para el SII.',
-    puntos: ['Venta rápida con canal y medio de pago, también sin señal', 'Ferias: ventas por día y por hora, resultado del puesto', 'Consignaciones: entrega, liquidación, lo no vendido sigue en el local o vuelve a bodega', 'Órdenes de venta con PDF y WhatsApp', 'Por facturar y favorito que rellena el facturador gratuito del SII con referencia a la orden', 'Clientes empresa y clientes finales, encargos con abono']
-  } },
-  { clave: 'cobranza', titulo: 'Cobranza', pendiente: {
-    fase: 3, resumen: 'Qué se debe, quién lo debe y desde cuándo.',
-    puntos: ['Folios pendientes por cliente con días de atraso', 'Recordatorios por WhatsApp en tono amable o firme', 'Estado de cuenta en PDF', 'Pagos parciales y un pago para varias facturas']
-  } },
+  { clave: 'ventas', titulo: 'Ventas', carga: () => import('./modulos/ventas.js') },
+  { clave: 'cobranza', titulo: 'Cobranza', carga: () => import('./modulos/cobranza.js') },
   { clave: 'produccion', titulo: 'Producción', carga: () => import('./modulos/produccion.js') },
   { clave: 'inventario', titulo: 'Inventario', carga: () => import('./modulos/inventario.js') },
   { clave: 'gastos', titulo: 'Gastos', carga: () => import('./modulos/gastos.js') },
   { clave: 'configuracion', titulo: 'Configuración', carga: () => import('./modulos/configuracion.js') }
 ];
-const EN_BARRA_MOVIL = ['inicio', 'ventas', 'produccion', 'inventario'];
+const EN_BARRA_MOVIL = ['inicio', 'ventas', 'cobranza', 'produccion'];
 
 // ---------------------------------------------------------------- Login
 function pantallaLogin(mensaje = '') {

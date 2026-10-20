@@ -50,7 +50,7 @@ function pasos() {
 }
 
 // Resumen de gastos: se escucha mientras Inicio está abierto.
-const resumenGastos = { porClasificar: [], porPagar: [], alertas: [], lotes: [] };
+const resumenGastos = { porClasificar: [], porPagar: [], alertas: [], lotes: [], porCobrar: [] };
 function gastos() {
   const pend = resumenGastos.porClasificar.filter((g) => !g.anulado);
   const pp = resumenGastos.porPagar.filter((g) => !g.anulado);
@@ -67,6 +67,24 @@ function gastos() {
             ${pp.length ? item(pesos(pp.reduce((s, g) => s + (g.total || 0), 0)), `Por pagar (${pp.length})`, '#/gastos/por-pagar') : ''}
             ${vencidas.length ? item(pesos(vencidas.reduce((s, g) => s + (g.total || 0), 0)), `Vencido (${vencidas.length})`, '#/gastos/por-pagar', true) : ''}
             ${alertas.length ? item(alertas.length, 'Alertas de precio sin revisar', '#/gastos/alertas', true) : ''}
+          </ul>
+        </section>`;
+}
+
+function cobranza() {
+  const fs = resumenGastos.porCobrar.filter((f) => !f.anulada);
+  if (!fs.length) return '';
+  const hoy = hoyISO();
+  const saldoF = (f) => Math.max(0, (f.total || 0) - (f.pagado || 0));
+  const total = fs.reduce((s, f) => s + saldoF(f), 0);
+  const venc = fs.filter((f) => f.vencimiento && f.vencimiento < hoy);
+  const clientes = new Set(venc.map((f) => f.clienteId)).size;
+  return `
+        <section class="panel">
+          <div class="panel-cabecera"><h2>Cobranza</h2><a href="#/cobranza/por-cobrar" class="enlace-chico">Ver por cobrar</a></div>
+          <ul class="lista-bajos">
+            <li><a href="#/cobranza/por-cobrar">Por cobrar</a><span>${pesos(total)}</span></li>
+            ${venc.length ? `<li><a href="#/cobranza/por-cobrar">Vencido, ${clientes} cliente${clientes > 1 ? 's' : ''}</a><span class="texto-alerta">${pesos(venc.reduce((s, f) => s + saldoF(f), 0))}</span></li>` : ''}
           </ul>
         </section>`;
 }
@@ -143,6 +161,8 @@ export default {
           </ol>
         </section>
 
+        ${cobranza()}
+
         ${taller()}
 
         ${gastos()}
@@ -154,7 +174,7 @@ export default {
           <ol class="fases">
             <li class="fase-hecha"><strong>Base</strong><span>Acceso, configuración y listas.</span></li>
             <li class="fase-hecha"><strong>Producción, inventario y gastos</strong><span>Insumos, recetas y bodega; gastos con XML o a mano que suman stock; piezas, lotes por etapa con mermas y quemas.</span></li>
-            <li class="fase-actual"><strong>Ventas y cobranza</strong><span>Venta rápida y ferias, clientes, consignaciones, órdenes de venta, facturación en el SII y cobros.</span></li>
+            <li class="fase-actual"><strong>Ventas y cobranza</strong><span>Ya están clientes y cobranza (3a). Siguen venta rápida y ferias (3b), y órdenes de venta, consignación y facturación en el SII (3c).</span></li>
             <li><strong>Agenda y clases</strong><span>Calendario de quemas, ferias, clases, entregas y compromisos de pago.</span></li>
           </ol>
         </section>`;
@@ -165,7 +185,8 @@ export default {
       escucharDonde('gastos', 'estado', '==', 'por-clasificar', (l) => { resumenGastos.porClasificar = l; pintar(); }),
       escucharDonde('gastos', 'pagoEstado', '==', 'por-pagar', (l) => { resumenGastos.porPagar = l; pintar(); }),
       escucharDonde('alertasPrecio', 'visto', '==', false, (l) => { resumenGastos.alertas = l; pintar(); }),
-      escucharDonde('lotes', 'estado', '==', 'en-proceso', (l) => { resumenGastos.lotes = l; pintar(); })
+      escucharDonde('lotes', 'estado', '==', 'en-proceso', (l) => { resumenGastos.lotes = l; pintar(); }),
+      escucharDonde('facturas', 'abierta', '==', true, (l) => { resumenGastos.porCobrar = l; pintar(); })
     ];
     return () => des.forEach((u) => u());
   }

@@ -150,13 +150,41 @@ service cloud.firestore {
       allow delete: if false;
     }
 
+    // Clientes: se editan y se archivan.
+    match /clientes/{id} {
+      allow read: if permitido();
+      allow create, update: if permitido() && firmado() && request.resource.data.tipo in ['empresa', 'persona'];
+      allow delete: if false;
+    }
+
+    // Facturas emitidas (cuentas por cobrar): se registran pagos y se anulan; nunca se borran.
+    match /facturas/{id} {
+      allow read: if permitido();
+      allow create, update: if permitido() && firmado()
+        && request.resource.data.total is number
+        && request.resource.data.clienteId is string;
+      allow delete: if false;
+    }
+
+    // Pagos recibidos: una vez creados solo se pueden anular.
+    match /pagos/{id} {
+      allow read: if permitido();
+      allow create: if permitido() && firmado() && request.resource.data.monto is number && request.resource.data.anulado == false;
+      allow update: if permitido() && firmado()
+        && resource.data.anulado == false
+        && request.resource.data.anulado == true
+        && request.resource.data.diff(resource.data).affectedKeys()
+             .hasOnly(['anulado', 'motivoAnulacion', 'anuladoEn', 'actualizado', 'actualizadoPor']);
+      allow delete: if false;
+    }
+
     // Colecciones de las fases siguientes (insumos, piezas, ventas, gastos…).
     // Se leen y escriben solo con permiso; nunca se borran.
     // (Excluye las colecciones de arriba para no saltarse sus reglas:
     // en Firestore basta que una regla permita para que se permita.)
     match /{coleccion}/{docId} {
       allow read: if permitido();
-      allow create, update: if permitido() && !(coleccion in ['config', 'listas', 'insumos', 'recetas', 'movimientos', 'preparaciones', 'conteos', 'gastos', 'proveedores', 'alertasPrecio', 'piezas', 'lotes', 'quemas', 'movPiezas']);
+      allow create, update: if permitido() && !(coleccion in ['config', 'listas', 'insumos', 'recetas', 'movimientos', 'preparaciones', 'conteos', 'gastos', 'proveedores', 'alertasPrecio', 'piezas', 'lotes', 'quemas', 'movPiezas', 'clientes', 'facturas', 'pagos']);
       allow delete: if false;
     }
   }

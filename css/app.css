@@ -664,3 +664,27 @@ h2.separado { margin-top: 18px; }
 .dos { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; } @media (max-width: 560px) { .dos { grid-template-columns: 1fr; } }
 .tabla-entrada select { appearance: none; width: 100%; min-width: 150px; min-height: 40px; padding: 6px 30px 6px 10px; border: 1px solid var(--borde-fuerte); border-radius: var(--r-chico); background: #fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8'%3E%3Cpath d='M1 1l5 5 5-5' fill='none' stroke='%235E564D' stroke-width='1.6'/%3E%3C/svg%3E") no-repeat right 10px center; }
 .tabla-entrada input[type=checkbox] { accent-color: var(--cobalto); width: 18px; height: 18px; }
+
+/* ============================================================ Entrega 3a: clientes y cobranza */
+.etiqueta-ok { background: var(--celadon-claro); color: var(--celadon-osc); }
+.tachado { color: var(--tinta-tenue); text-decoration: line-through; }
+.con-boton { display: flex; gap: 8px; align-items: center; }
+.con-boton select { flex: 1; min-width: 0; }
+.deudores { display: flex; flex-direction: column; gap: 12px; }
+.deudor { margin: 0; display: flex; flex-direction: column; gap: 10px; }
+.deudor-atrasado { border-left: 4px solid var(--ocre); }
+.deudor-grave { border-left: 4px solid var(--rosa); }
+.deudor-cabeza { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+.deudor-cabeza h2 { margin-bottom: 2px; }
+.deudor-cabeza p { font-size: 0.88rem; }
+.deudor-total { font-size: 1.35rem; font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.folios { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--borde); }
+.folio { width: 100%; display: grid; grid-template-columns: 1fr 110px 150px 140px; gap: 10px; align-items: center; padding: 8px 4px; border: 0; border-bottom: 1px solid var(--borde); background: none; text-align: left; font-size: 0.92rem; cursor: pointer; color: var(--tinta); font-variant-numeric: tabular-nums; }
+.folio:hover { background: var(--loza); }
+.folio-monto { text-align: right; font-weight: 600; }
+.deudor-acciones { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; }
+@media (max-width: 560px) {
+  .folio { grid-template-columns: 1fr auto; gap: 2px 10px; }
+  .deudor-acciones { justify-content: stretch; }
+  .deudor-acciones .btn { flex: 1 1 auto; }
+}
