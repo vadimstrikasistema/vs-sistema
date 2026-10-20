@@ -8,7 +8,8 @@ import {
 } from '../stock.js';
 import { opcionesLista, opcionesInsumos, nombreUnidad, campoNumero, vacio, pestanas, avisoError, avisoGuardado } from '../comunes.js';
 import { editarInsumo } from './produccion.js';
-import { ETAPAS, movimientoPieza, costoFicha } from '../piezas-core.js';
+import { ETAPAS, movimientoPieza, costoFicha, TIPOS_MOV_PIEZA } from '../piezas-core.js';
+import { consignacionesAbiertas, piezasEnTienda, costoEnTienda, consignadasDe } from '../b2b-core.js';
 import { escucharDonde, documentosPorCampo, refDoc } from '../stock.js';
 
 const PEST = [['bodega', 'Bodega'], ['movimientos', 'Movimientos'], ['piezas', 'Piezas']];
@@ -447,10 +448,14 @@ function vistaPiezasInv(el) {
     const segunda = fichas.reduce((s, p) => s + (p.stockSegunda || 0), 0);
     const valor = fichas.reduce((s, p) => s + (p.valorStock || 0), 0);
     const proceso = activos.reduce((s, l) => s + l.cantidadActual, 0);
+    const abiertas = consignacionesAbiertas();
+    const consig = abiertas.reduce((s, c) => s + piezasEnTienda(c), 0);
+    const valorConsig = abiertas.reduce((s, c) => s + costoEnTienda(c), 0);
     $('[data-resumen]', el).innerHTML = `
       <div class="dato"><span class="dato-etq">Terminadas de primera</span><span class="dato-valor">${numero(primera, 0)}</span></div>
       <div class="dato"><span class="dato-etq">De segunda</span><span class="dato-valor">${numero(segunda, 0)}</span></div>
       <div class="dato"><span class="dato-etq">En proceso</span><span class="dato-valor">${numero(proceso, 0)}</span></div>
+      ${consig ? `<div class="dato"><span class="dato-etq">En consignación ${info('Piezas que están en tiendas. Ya no cuentan en el stock del taller, pero siguen siendo tuyas hasta que se venden.')}</span><span class="dato-valor">${numero(consig, 0)} · ${pesos(valorConsig)}</span></div>` : ''}
       <div class="dato"><span class="dato-etq">Valor de lo terminado ${info('Lo que costó hacer las piezas que hay en stock, con sus mermas, horas y quemas.')}</span><span class="dato-valor">${pesos(valor)}</span></div>`;
     const porEtapa = ['modelado', 'seco', 'bizcochado', 'esmaltado'].map((k) => {
       const ls = activos.filter((l) => l.etapa === k);
@@ -465,9 +470,10 @@ function vistaPiezasInv(el) {
     if (!fichas.length) { lista.innerHTML = vacio('Sin piezas todavía', 'Crea las fichas en Producción → Piezas. Las que ya tienes hechas puedes cargarlas aquí con «Ajuste de piezas» y motivo «Inventario inicial».', '<a class="btn btn-primario" href="#/produccion/piezas">Crear fichas</a>'); return; }
     lista.innerHTML = `<section class="panel tabla-panel"><ul class="filas">${fichas.map((p) => {
       const enP = activos.filter((l) => l.piezaId === p.id).reduce((s, l) => s + l.cantidadActual, 0);
+      const enC = consignadasDe(p.id);
       return `<li><button class="fila" data-id="${esc(p.id)}">
         <span class="fila-principal"><span class="fila-nombre">${esc(p.nombre)}</span>
-          <span class="fila-meta"><span>${esc(nombreItem('categoriasPieza', p.categoria))} · ${esc(p.tamano)}</span>${enP ? `<span>${enP} en proceso</span>` : ''}${p.tipo === 'unica' ? `<span class="etiqueta">${esc({ disponible: 'Disponible', reservada: 'Reservada', vendida: 'Vendida' }[p.estadoUnica] || 'Única')}</span>` : ''}</span></span>
+          <span class="fila-meta"><span>${esc(nombreItem('categoriasPieza', p.categoria))} · ${esc(p.tamano)}</span>${enP ? `<span>${enP} en proceso</span>` : ''}${enC ? `<span>${enC} en consignación</span>` : ''}${p.tipo === 'unica' ? `<span class="etiqueta">${esc({ disponible: 'Disponible', reservada: 'Reservada', vendida: 'Vendida' }[p.estadoUnica] || 'Única')}</span>` : ''}</span></span>
         <span class="fila-dato fila-dato-fuerte"><span class="fila-etq">Primera</span>${numero(p.stock || 0, 0)}</span>
         <span class="fila-dato"><span class="fila-etq">Segunda</span>${numero(p.stockSegunda || 0, 0)}</span>
       </button></li>`;
@@ -499,7 +505,7 @@ async function detallePieza(p) {
         caja.innerHTML = `<ul class="movs">${movs.slice(0, 100).map((m) => `
           <li class="mov ${m.anulado ? 'anulado' : ''}">
             <span class="mov-fecha">${fechaCorta(m.fecha)}</span>
-            <span class="mov-desc"><span>${esc(m.tipo === 'produccion' ? 'Sale del horno' : m.tipo === 'anulacion' ? 'Anulación' : `Ajuste · ${nombreItem('motivosAjuste', m.motivo)}`)}${m.calidad === 'segunda' ? ' · de segunda' : ''}${m.nota ? ` · ${esc(m.nota)}` : ''}</span>
+            <span class="mov-desc"><span>${esc(m.tipo === 'ajuste' ? `Ajuste · ${nombreItem('motivosAjuste', m.motivo)}` : TIPOS_MOV_PIEZA[m.tipo] || m.tipo)}${m.calidad === 'segunda' ? ' · de segunda' : ''}${m.nota ? ` · ${esc(m.nota)}` : ''}</span>
               <span class="texto-tenue mov-quien">${esc((m.actualizadoPor || '').split('@')[0])}</span></span>
             <span class="mov-cant ${m.cantidad >= 0 ? 'entra' : 'sale'}">${m.cantidad >= 0 ? '+' : '−'}${numero(Math.abs(m.cantidad), 0)} u</span>
             <span class="mov-valor">${pesos(Math.abs(m.valor || 0))}</span>

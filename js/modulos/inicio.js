@@ -87,7 +87,9 @@ function ventasHoy() {
 
 function cobranza() {
   const fs = resumenGastos.porCobrar.filter((f) => !f.anulada);
-  if (!fs.length) return '';
+  const ovs = Object.values(estado.ordenes || {}).filter((o) => !o.anulada && o.entregada && !o.facturada);
+  const cons = Object.values(estado.consignaciones || {}).filter((c) => !c.anulada && !c.cerrada);
+  if (!fs.length && !ovs.length && !cons.length) return '';
   const hoy = hoyISO();
   const saldoF = (f) => Math.max(0, (f.total || 0) - (f.pagado || 0));
   const total = fs.reduce((s, f) => s + saldoF(f), 0);
@@ -99,6 +101,8 @@ function cobranza() {
           <ul class="lista-bajos">
             <li><a href="#/cobranza/por-cobrar">Por cobrar</a><span>${pesos(total)}</span></li>
             ${venc.length ? `<li><a href="#/cobranza/por-cobrar">Vencido, ${clientes} cliente${clientes > 1 ? 's' : ''}</a><span class="texto-alerta">${pesos(venc.reduce((s, f) => s + saldoF(f), 0))}</span></li>` : ''}
+            ${ovs.length ? `<li><a href="#/ventas/por-facturar">Por facturar, ${ovs.length} orden${ovs.length > 1 ? 'es' : ''}</a><span class="texto-alerta">${pesos(ovs.reduce((s, o) => s + o.total, 0))}</span></li>` : ''}
+            ${cons.length ? `<li><a href="#/ventas/consignacion">En consignación, ${cons.length} tienda${cons.length > 1 ? 's' : ''}</a><span>${numero(cons.reduce((s, c) => s + c.lineas.reduce((t, l) => t + (l.entregadas || 0) - (l.vendidas || 0) - (l.devueltas || 0) - (l.perdidas || 0), 0), 0), 0)} piezas</span></li>` : ''}
           </ul>
         </section>`;
 }
@@ -190,7 +194,8 @@ export default {
           <ol class="fases">
             <li class="fase-hecha"><strong>Base</strong><span>Acceso, configuración y listas.</span></li>
             <li class="fase-hecha"><strong>Producción, inventario y gastos</strong><span>Insumos, recetas y bodega; gastos con XML o a mano que suman stock; piezas, lotes por etapa con mermas y quemas.</span></li>
-            <li class="fase-actual"><strong>Ventas y cobranza</strong><span>Ya están clientes y cobranza (3a), y venta rápida, ferias y análisis (3b). Siguen órdenes de venta, consignación y facturación en el SII (3c).</span></li>
+            <li class="fase-hecha"><strong>Ventas y cobranza</strong><span>Clientes y cobranza; venta rápida, ferias y análisis; órdenes de venta, consignación y facturación en el SII.</span></li>
+            <li class="fase-actual"><strong>Inventario de piezas</strong><span>Conteo de piezas en enero; con eso se puede encender el control de stock.</span></li>
             <li><strong>Agenda y clases</strong><span>Calendario de quemas, ferias, clases, entregas y compromisos de pago.</span></li>
           </ol>
         </section>`;

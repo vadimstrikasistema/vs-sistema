@@ -18,6 +18,8 @@ export const estado = {
   clientes: {},     // id → cliente (empresas y clientes finales)
   ferias: {},       // id → feria
   ventas: null,     // config/ventas: control de stock, comisiones
+  ordenes: {},      // id → orden de venta a empresas
+  consignaciones: {}, // id → entrega en consignación
   proveedores: {},  // rut sin puntos → proveedor, con lo aprendido de sus facturas
   listo: false
 };
@@ -116,6 +118,15 @@ export function escuchar() {
     estado.proveedores = m;
     avisar();
   }, errorEscucha));
+  // Órdenes y consignaciones: son decenas al año, se escuchan completas.
+  for (const col of ['ordenes', 'consignaciones']) {
+    desuscribir.push(onSnapshot(collection(db, col), (qs) => {
+      const m = {};
+      qs.forEach((d) => { m[d.id] = { id: d.id, ...d.data() }; });
+      estado[col] = m;
+      avisar();
+    }, errorEscucha));
+  }
   desuscribir.push(onSnapshot(collection(db, 'recetas'), (qs) => {
     const m = {};
     qs.forEach((d) => { m[d.id] = { id: d.id, ...d.data() }; });

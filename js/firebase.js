@@ -51,5 +51,6 @@ export const {
   query,
   where,
   orderBy,
-  limit
+  limit,
+  runTransaction
 } = fsMod;

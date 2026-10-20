@@ -112,13 +112,15 @@ Estas decisiones se respetan en todas las fases:
 | `piezas` | una por ficha (serie o pieza única) | `nombre`, `tipo`, `categoria`, `tamano` (S, M, L, XL), `pastaId` y `pastaKg`, `esmaltes[]` (insumo y gramos por pieza), `sinEsmalte`, `otros[]`, `horas`, `precioB2C` (con IVA), `precioB2B` (neto), y el resumen `stock`, `stockSegunda`, `valorStock`, `costoUltimo`; `estadoUnica` en piezas únicas |
 | `lotes` | uno por tanda de piezas | pieza, `cantidadInicial`, `cantidadActual`, `etapa` (modelado, seco, bizcochado, esmaltado, terminado), `estado`, `historial[]` de cada etapa con lo que entró, salió y se perdió (y por qué), costos acumulados (`costoPasta`, `costoEsmalte`, `costoOtros`, `costoHoras`, `costoQuemas`, `creditoReciclaje`), al terminar `primera`, `segunda`, `costoUnitario`, y los movimientos que generó |
 | `quemas` | una por quema | `tipo` (bizcocho o esmalte), fecha, cono, `energia` y `costo`, `puntos` y `ocupacion`, y por lote: piezas, puntos, costo asignado y lo que salió |
-| `movPiezas` | uno por entrada o salida de piezas terminadas | pieza, `calidad` (primera o segunda), `cantidad` con signo, costo, `tipo` (produccion, ajuste, anulacion), motivo, `anulado` |
+| `movPiezas` | uno por entrada o salida de piezas terminadas | pieza, `calidad` (primera o segunda), `cantidad` con signo, costo, `tipo` (produccion, ajuste, venta, venta-b2b, consignacion, devolucion, anulacion), motivo, `ref`, `anulado` |
 | `clientes` | uno por cliente | `tipo` (empresa o persona), `rut`, `rutLimpio`, `razonSocial`, `nombre` (del local), `giro`, `direccion`, `comuna`, `contacto`, `whatsapp`, `correo`, `instagram`, `condicionDias` (plazo de pago), `ultimoRecordatorio`, `notas`, `archivado` |
-| `facturas` | una por documento emitido (cuenta por cobrar) | `origen` (xml o manual), `tipoDoc` (33, 34, 61, 0 sin documento), `folio`, `fecha`, `mes`, `vencimiento`, cliente, `neto`, `iva`, `total`, `lineas`, `referencias`, `pagado`, `estado` (pendiente, parcial, pagada, anulada, nota-credito), `abierta`, `aplicadaA` en notas de crédito |
+| `facturas` | una por documento emitido (cuenta por cobrar) | `origen` (xml o manual), `tipoDoc` (33, 34, 61, 0 sin documento), `folio`, `fecha`, `mes`, `vencimiento`, cliente, `neto`, `iva`, `total`, `lineas`, `referencias`, `pagado`, `estado` (pendiente, parcial, pagada, anulada, nota-credito), `abierta`, `aplicadaA` en notas de crédito; `ordenIds` y `ordenNumeros` si viene de órdenes de venta |
 | `pagos` | uno por pago recibido | cliente, `fecha`, `medio`, `referencia`, `monto`, `aplicaciones[]` (factura y monto), `tipo` (pago o nota-credito), `anulado` |
 | `ventas` | una por venta directa | `fecha`, `mes`, `hora`, `canal`, `feriaId`, `medio`, cliente, `lineas[]` (pieza o sin ficha, `calidad`, cantidad, precio con IVA, `costoUnitario`), `descuento`, `total`, `neto`, `iva`, `comision`, `costo`, `boleta` (`emitida`, `folio`), `movs` (salidas de piezas), `anulado` |
 | `ferias` | una por feria | `nombre`, `lugar`, `fechaInicio`, `fechaFin`, `costoPuesto`, `otrosCostos`, `notas`, `cerrada` |
 | `config` | `ventas` | `controlarStock`, `comisiones` por medio de pago, `recordarBoleta` |
+| `ordenes` | una por orden de venta a empresas | `numero` (correlativo), `fecha`, `mes`, cliente (`clienteId`, `razonSocial`, `rutCliente`, `rutLimpio`), `condicionDias`, `origen` (directa o consignacion), `consignacionId` y `consignacionNumero`, `lineas[]` (pieza, `calidad`, cantidad, precio neto, `subtotal`, `costoUnitario`), `neto`, `iva`, `total`, `costo`, `entregada`, `fechaEntrega`, `facturada`, `facturaId`, `folio`, `fechaFactura`, `nota`, `anulada` |
+| `consignaciones` | una por tienda con piezas en consignación | `numero`, `fecha`, cliente, `lineas[]` (`key`, pieza, `calidad`, precio neto, `costoUnitario`, `entregadas`, `vendidas`, `devueltas`, `perdidas`), `entregas[]`, `liquidaciones[]` (fecha, vendidas, vuelven, vuelven dañadas, perdidas y su costo, `ordenId`), `cerrada`, `nota`, `anulada` |
 | `alertasPrecio` | una por cambio de precio de 10 % o más | insumo, costo anterior y nuevo, variación, proveedor, documento, recetas afectadas, `visto` |
 
 Listas iniciales: tipos de insumo, unidades, categorías de pieza, canales de venta, medios de pago, áreas del negocio, ítems de gasto, motivos de merma y motivos de ajuste de inventario.
@@ -138,6 +140,8 @@ js/datos-iniciales.js   valores con que parte el sistema
 js/ui.js                utilidades de interfaz (avisos, diálogos, RUT)
 js/iconos.js            íconos
 js/app.js               ingreso, menú y navegación
+js/b2b-core.js          órdenes de venta, consignación y paso a factura
+js/favorito-sii.js      favorito que rellena el facturador gratuito del SII
 js/modulos/             una pantalla por módulo
 fonts/, img/            tipografías y logo (incluidos para funcionar sin señal)
 ```
@@ -154,10 +158,21 @@ fonts/, img/            tipografías y logo (incluidos para funcionar sin señal
 3. **Ventas y cobranza**, en tres entregas:
    - **3a** · clientes y cobranza: facturas emitidas desde el XML o a mano, notas de crédito, pagos en efectivo o transferencia, recordatorios por WhatsApp y estado de cuenta en PDF. ✔
    - **3b** · venta rápida pieza por pieza, también sin señal, con boleta y folio, cierre del día, ferias con su resultado, historial y análisis; vender sin inventario cargado hasta enero. ✔
-   - **3c** · órdenes de venta, consignaciones con liquidación y facturación con el favorito del facturador del SII, conectadas con la cobranza.
+   - **3c** · órdenes de venta con PDF por WhatsApp, consignaciones con liquidación y facturación con el favorito del facturador del SII, conectadas con la cobranza. ✔ Pendiente: confirmar los nombres de campo del facturador con el favorito que ya usa el taller, y guía de despacho para consignación si hace falta.
 4. **Agenda y clases** · calendario con quemas, ferias, clases, entregas y compromisos de pago.
 
 ## Historial de versiones
+
+### 0.7.0 · Fase 3, entrega 3c: órdenes de venta, consignación y facturación
+- **Ventas → Órdenes:** orden de venta a tiendas y cafeterías con correlativo (OV 1, OV 2…), precio neto a tiendas y el último precio cobrado a cada cliente; se entrega al crearla o después (ahí salen las piezas del stock); PDF con datos de transferencia para mandar por WhatsApp; margen; anulación que devuelve las piezas.
+- **Ventas → Consignación:** entrega a una tienda (las piezas salen del stock y quedan «en la tienda»), más piezas a la misma consignación, comprobante en PDF con firmas, y liquidación: lo vendido pasa a una OV lista para facturar; lo que no se vendió sigue en la tienda o vuelve al taller (en buen estado, dañado como de segunda, o perdido).
+- **Ventas → Por facturar:** órdenes entregadas sin factura, juntas por cliente; se eligen una o varias para una sola factura. «Preparar factura» copia los datos para el favorito, abre el facturador del SII y muestra cada dato para copiar a mano; la referencia es la nota de pedido (802) con el número de la OV. Al anotar el folio, la factura pasa a Cobranza con su vencimiento; si el XML ya estaba cargado, se vincula sin duplicar.
+- **Favorito «VS → SII»:** primer clic escribe el RUT del cliente; segundo clic, el detalle (agrega líneas si faltan) y las referencias. Avisa lo que no pudo escribir y, si no encuentra los campos, ofrece la lista de la página para ajustarlo.
+- **Cobranza:** la factura muestra sus órdenes; al anularla, las órdenes vuelven a «Por facturar».
+- **Inventario:** piezas en consignación (cantidad y costo) y el nombre de cada movimiento en el historial de una pieza.
+- **Inicio:** lo que hay por facturar y las tiendas con piezas en consignación.
+- **Reglas de Firestore nuevas** para órdenes y consignaciones. **Hay que volver a publicarlas.**
+- Estructura de datos versión 7.
 
 ### 0.6.0 · Fase 3, entrega 3b: venta rápida, ferias y análisis
 - **Ventas → Venta rápida:** grilla de piezas con búsqueda y categorías, «Otra pieza» para lo que no tiene ficha, carrito con cantidades, primera o segunda (con su precio), precio editable y descuento; medio de pago con su comisión; cliente final opcional; boleta y folio; otra fecha para pasar ventas del cuaderno. Funciona sin señal.

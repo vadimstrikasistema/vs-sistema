@@ -135,7 +135,13 @@ export const margen = (precioNetoV, costo) => (precioNetoV > 0 ? (precioNetoV - 
 // ---------------------------------------------------------------- Movimientos de piezas
 // Igual que los insumos: cada entrada o salida de piezas terminadas es un
 // movimiento, y la ficha guarda `stock`, `stockSegunda` y `valorStock`.
-export function movimientoPieza(lote, { piezaId, calidad = 'primera', cantidad, costoUnitario = null, tipo, fecha, motivo = null, nota = '', ref = null }) {
+export const TIPOS_MOV_PIEZA = {
+  produccion: 'Sale del horno', venta: 'Venta directa', 'venta-b2b': 'Orden de venta', consignacion: 'Entregada en consignación',
+  devolucion: 'Vuelve de consignación', anulacion: 'Anulación', ajuste: 'Ajuste'
+};
+
+// `actualizaCosto`: una devolución o anulación entra con su costo, pero no cambia el «costo del último lote».
+export function movimientoPieza(lote, { piezaId, calidad = 'primera', cantidad, costoUnitario = null, tipo, fecha, motivo = null, nota = '', ref = null, actualizaCosto = true }) {
   const p = estado.piezas[piezaId];
   const total = (p.stock || 0) + (p.stockSegunda || 0);
   const prom = total > 0 && p.valorStock > 0 ? p.valorStock / total : (p.costoUltimo || 0);
@@ -148,7 +154,7 @@ export function movimientoPieza(lote, { piezaId, calidad = 'primera', cantidad, 
   });
   const campo = calidad === 'segunda' ? 'stockSegunda' : 'stock';
   const cambios = { [campo]: increment(cantidad), valorStock: increment(valor), ...firma() };
-  if (cantidad > 0 && costoUnitario != null) cambios.costoUltimo = costoUnitario;
+  if (cantidad > 0 && costoUnitario != null && actualizaCosto && !['anulacion', 'devolucion'].includes(tipo)) cambios.costoUltimo = costoUnitario;
   if (p.tipo === 'unica' && cantidad > 0) cambios.estadoUnica = 'disponible';
   if (p.tipo === 'unica' && cantidad < 0 && (p.stock || 0) + (p.stockSegunda || 0) + cantidad <= 0) cambios.estadoUnica = 'sin-stock';
   lote.update(refDoc('piezas', piezaId), cambios);

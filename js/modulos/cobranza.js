@@ -408,6 +408,7 @@ async function detalleFactura(f) {
         <div><dt>Vencimiento</dt><dd>${fechaCorta(f.vencimiento)}${f.abierta ? ` · ${textoAtraso(diasAtraso(f))}` : ''}</dd></div>
         <div><dt>Neto · IVA</dt><dd>${pesos(f.neto || f.exento || 0)} · ${pesos(f.iva || 0)}</dd></div>
         ${f.rutCliente ? `<div><dt>RUT</dt><dd>${esc(f.rutCliente)}</dd></div>` : ''}
+        ${(f.ordenNumeros || []).length ? `<div><dt>Órdenes de venta</dt><dd>${f.ordenNumeros.map((n) => `OV ${esc(n)}`).join(', ')}</dd></div>` : ''}
       </dl>
       ${(f.lineas || []).length ? `<h3>Detalle</h3><ul class="lista-bajos">${f.lineas.map((l) => `<li><span>${l.cantidad && l.cantidad !== 1 ? `${numero(l.cantidad)} × ` : ''}${esc(l.nombre)}</span><span>${pesos(l.monto)}</span></li>`).join('')}</ul>` : ''}
       <h3>Pagos</h3>
@@ -416,7 +417,7 @@ async function detalleFactura(f) {
       $('[data-pagar]', dlg)?.addEventListener('click', () => { cerrar(); pagoDialogo(f.clienteId); });
       $('[data-anular]', dlg)?.addEventListener('click', async () => {
         if (activos.length) { toast('Esta factura tiene pagos. Anula primero los pagos en la pestaña Pagos.', 'error'); return; }
-        if (!(await confirmar('Anular factura', `La ${esc(etiquetaFactura(f).toLowerCase())} deja de estar por cobrar y queda en el historial como anulada. En el SII se anula con una nota de crédito; si la emitiste, cárgala también.`, 'Anular', true))) return;
+        if (!(await confirmar('Anular factura', `La ${esc(etiquetaFactura(f).toLowerCase())} deja de estar por cobrar y queda en el historial como anulada. En el SII se anula con una nota de crédito; si la emitiste, cárgala también.${(f.ordenIds || []).length ? ' Sus órdenes de venta vuelven a «Por facturar».' : ''}`, 'Anular', true))) return;
         const lote = nuevoLote();
         anularFactura(lote, f);
         enviar(lote.commit(), { alGuardar: avisoGuardado(toast, 'Factura anulada'), alFallar: fallo });

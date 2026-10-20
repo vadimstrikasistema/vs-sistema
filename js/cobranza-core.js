@@ -166,6 +166,10 @@ export function crearFacturaManual(lote, datos) {
 
 export function anularFactura(lote, f, motivo = '') {
   lote.update(refDoc('facturas', f.id), { anulada: true, abierta: false, estado: 'anulada', motivoAnulacion: motivo, anuladaEn: Date.now(), ...firma() });
+  // Las órdenes de venta que cubría vuelven a «Por facturar».
+  (f.ordenIds || []).forEach((id) => {
+    if (estado.ordenes?.[id]) lote.update(refDoc('ordenes', id), { facturada: false, facturaId: null, folio: '', fechaFactura: null, ...firma() });
+  });
 }
 
 export const signo = signoDoc;

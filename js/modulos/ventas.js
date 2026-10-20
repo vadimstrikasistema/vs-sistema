@@ -1,5 +1,5 @@
-// Ventas: por ahora Clientes (empresas y clientes finales). La venta rápida,
-// las ferias, las órdenes de venta y las consignaciones llegan en 3b y 3c.
+// Ventas: venta rápida y ferias (clientes finales), órdenes de venta,
+// consignación y facturación (empresas), y la ficha de clientes.
 import { estado, alCambiar, enviar, firma } from '../datos.js';
 import { esc, info, toast, $, $$, formulario, rutValido, formatearRut, limpiarRut, fechaCorta } from '../ui.js';
 import { nuevoLote, refNueva, refDoc } from '../stock.js';
@@ -7,8 +7,9 @@ import { pestanas, vacio, avisoError, avisoGuardado } from '../comunes.js';
 import { CONDICIONES, nombreCliente, clientePorRut } from '../cobranza-core.js';
 import { ICONOS } from '../iconos.js';
 import { vistaVentaRapida, vistaHistorial, vistaFerias, vistaAnalisis } from './venta-rapida.js';
+import { vistaOrdenes, vistaConsignacion, vistaPorFacturar } from './ventas-b2b.js';
 
-const PEST = [['venta-rapida', 'Venta rápida'], ['historial', 'Historial'], ['ferias', 'Ferias'], ['analisis', 'Análisis'], ['clientes', 'Clientes'], ['ordenes', 'Órdenes y consignación']];
+const PEST = [['venta-rapida', 'Venta rápida'], ['historial', 'Historial'], ['ferias', 'Ferias'], ['analisis', 'Análisis'], ['ordenes', 'Órdenes'], ['consignacion', 'Consignación'], ['por-facturar', 'Por facturar'], ['clientes', 'Clientes']];
 const fallo = avisoError(toast);
 const norm = (t) => String(t || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
 
@@ -24,7 +25,9 @@ export default {
           historial: 'Todas las ventas directas, día por día.',
           ferias: 'Cada feria con sus fechas, costos y resultado.',
           analisis: 'Qué se vende, dónde, cómo se paga y a qué hora.',
-          ordenes: 'Órdenes de venta a empresas y piezas en consignación.'
+          ordenes: 'Pedidos de tiendas y cafeterías, con PDF para mandar por WhatsApp.',
+          consignacion: 'Piezas que dejaste en tiendas para que las vendan, y sus liquidaciones.',
+          'por-facturar': 'Órdenes entregadas sin factura, listas para el facturador del SII.'
         }[actual]}</p>
       </header>
       ${pestanas('ventas', PEST, actual)}
@@ -35,9 +38,9 @@ export default {
     if (actual === 'historial') return vistaHistorial(c);
     if (actual === 'ferias') return vistaFerias(c);
     if (actual === 'analisis') return vistaAnalisis(c);
-    const pend = ['Órdenes de venta con PDF y WhatsApp, con el precio a tiendas de cada pieza', 'Consignación: entrega, liquidación, lo no vendido sigue en la tienda o vuelve al taller', 'Por facturar y favorito que rellena el facturador gratuito del SII con la referencia a la orden', 'Cada factura pasa sola a Cobranza'];
-    c.innerHTML = `<section class="panel pendiente"><p class="pendiente-fase">Llega en la entrega 3c</p>
-      <ul class="lista-puntos">${pend.map((x) => `<li>${esc(x)}</li>`).join('')}</ul></section>`;
+    if (actual === 'ordenes') return vistaOrdenes(c);
+    if (actual === 'consignacion') return vistaConsignacion(c);
+    if (actual === 'por-facturar') return vistaPorFacturar(c);
     return null;
   }
 };

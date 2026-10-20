@@ -272,6 +272,7 @@ body.modo-login { background: var(--loza); }
 .pestana { padding: 10px 14px; color: var(--tinta-suave); text-decoration: none; font-weight: 500; border-bottom: 2px solid transparent; margin-bottom: -1px; white-space: nowrap; }
 .pestana:hover { color: var(--tinta); }
 .pestana.activa { color: var(--cobalto); border-bottom-color: var(--cobalto); }
+.pestanas:has(.pestana:nth-child(7)) .pestana { padding: 10px 10px; }
 
 .campos { display: grid; grid-template-columns: 1fr; gap: 16px; }
 @media (min-width: 640px) { .campos { grid-template-columns: 1fr 1fr; } .campo-ancho { grid-column: 1 / -1; } }
@@ -743,3 +744,56 @@ h2.separado { margin-top: 18px; }
 .vr-pieza-nombre { padding-right: 26px; }
 .vr-barra .btn { text-decoration: none; }
 @media (max-width: 400px) { .vr-subtotal { min-width: 64px; font-size: 0.92rem; } .vr-cant .btn-icono { width: 30px; } }
+
+/* ================================================================ 3c · Órdenes, consignación y facturación */
+.b2b-agregar { display: flex; align-items: flex-end; gap: 10px; margin: 14px 0 6px; }
+.b2b-agregar .campo { flex: 1 1 auto; }
+.b2b-lineas { list-style: none; margin: 0; padding: 0; }
+.b2b-lineas li { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 6px 12px; align-items: center; padding: 8px 0; border-top: 1px solid var(--borde); }
+.b2b-nombre { font-weight: 500; }
+.b2b-nombre-input { min-height: 36px; padding: 4px 8px; border: 1px solid var(--borde-fuerte); border-radius: var(--r-chico); min-width: 0; }
+.b2b-datos { display: grid; grid-template-columns: 38px 76px 112px 92px 38px; gap: 8px; align-items: center; }
+.b2b-datos input { width: 100%; min-width: 0; min-height: 36px; padding: 4px 22px 4px 8px; border: 1px solid var(--borde-fuerte); border-radius: var(--r-chico); text-align: right; }
+.b2b-datos .sufijo { right: 7px; }
+.b2b-subtotal { text-align: right; font-weight: 600; font-variant-numeric: tabular-nums; }
+.b2b-totales { display: flex; justify-content: flex-end; gap: 22px; flex-wrap: wrap; padding: 10px 0 4px; border-top: 1px solid var(--borde-fuerte); font-variant-numeric: tabular-nums; color: var(--tinta-suave); }
+.b2b-totales strong { color: var(--tinta); margin-left: 4px; }
+.b2b-totales span:last-child strong { font-size: 1.15rem; }
+.b2b-piezas { margin: 0; font-size: 0.92rem; line-height: 1.5; }
+.b2b-valor { margin-right: auto; align-self: center; font-size: 0.88rem; }
+.b2b-cerrada { opacity: 0.75; }
+.b2b-ovs { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--borde); }
+.b2b-ovs li { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 6px 2px; border-bottom: 1px solid var(--borde); }
+.b2b-ovs .interruptor { min-height: 36px; }
+.b2b-ov-monto { font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.b2b-num { width: 72px; }
+.b2b-liquidar td { vertical-align: middle; }
+.b2b-copiar { display: inline-flex; align-items: baseline; gap: 10px; flex-wrap: wrap; text-align: right; justify-content: flex-end; }
+.b2b-manual { margin: 14px 0; padding: 10px 14px; border: 1px solid var(--borde); border-radius: var(--r); background: var(--loza); }
+.b2b-manual summary { cursor: pointer; font-weight: 600; }
+.b2b-manual .lista-bajos li > span:first-child.b2b-copiar { text-align: left; justify-content: flex-start; }
+.pasos-sii { margin: 0 0 8px; padding-left: 22px; display: flex; flex-direction: column; gap: 12px; }
+.pasos-sii li { line-height: 1.45; }
+.pasos-sii .grupo-botones { margin-top: 8px; }
+.favorito { margin-bottom: 16px; }
+.favorito summary { cursor: pointer; display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; list-style: none; }
+.favorito summary::-webkit-details-marker { display: none; }
+.favorito summary::before { content: '▸'; color: var(--cobalto); }
+.favorito[open] summary::before { content: '▾'; }
+.favorito-titulo { font-weight: 600; }
+.favorito-cuerpo { margin-top: 12px; display: flex; flex-direction: column; gap: 10px; }
+.favorito-cuerpo .lista-puntos li { margin-bottom: 6px; }
+[data-favorito] { cursor: grab; border-style: dashed; }
+@media (max-width: 640px) {
+  .b2b-lineas li { grid-template-columns: 1fr; }
+  .b2b-datos { grid-template-columns: 38px 64px minmax(0, 1fr) auto 30px; gap: 6px; }
+  .b2b-datos .btn-icono { width: 30px; height: 34px; }
+  .b2b-datos > * { min-width: 0; }
+  .b2b-subtotal { font-size: 0.92rem; }
+  .b2b-totales { justify-content: space-between; gap: 10px; }
+  .b2b-agregar { flex-wrap: wrap; }
+  .b2b-agregar .btn { flex: 1 1 auto; }
+  .b2b-valor { width: 100%; }
+}
+a.btn { text-decoration: none; }
+.b2b-manual .lista-bajos li, .pasos-sii + .b2b-manual li { align-items: center; }
