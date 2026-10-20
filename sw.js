@@ -1,14 +1,14 @@
 // Service worker: guarda la app en el equipo para que abra sin señal.
 // Los datos no pasan por aquí: los maneja la caché de Firestore.
 // Al publicar una versión nueva, cambia VERSION para que los equipos la descarguen.
-const VERSION = 'vs-0.5.0';
+const VERSION = 'vs-0.6.0';
 
 const ARCHIVOS = [
   './',
   'index.html',
   'manifest.webmanifest',
-  'css/app.css?v=0.5.0',
-  'js/app.js?v=0.5.0',
+  'css/app.css?v=0.6.0',
+  'js/app.js?v=0.6.0',
   'js/config.js',
   'js/firebase.js',
   'js/datos.js',
@@ -32,6 +32,8 @@ const ARCHIVOS = [
   'js/vendor/jspdf.umd.min.js',
   'js/modulos/ventas.js',
   'js/modulos/cobranza.js',
+  'js/ventas-core.js',
+  'js/modulos/venta-rapida.js',
   'img/logo-negro.svg',
   'img/moteado.svg',
   'img/icono.svg',

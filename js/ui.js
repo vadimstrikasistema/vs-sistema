@@ -128,8 +128,11 @@ export function leerNumero(texto) {
 export const numero = (n, dec = 2) =>
   Number.isFinite(n) ? n.toLocaleString('es-CL', { maximumFractionDigits: dec }) : '—';
 
-export const pesos = (n) =>
-  Number.isFinite(n) ? '$' + Math.round(n).toLocaleString('es-CL') : '—';
+export const pesos = (n) => {
+  if (!Number.isFinite(n)) return '—';
+  const r = Math.round(n);
+  return (r < 0 ? '−$' : '$') + Math.abs(r).toLocaleString('es-CL');
+};
 
 // Costo por unidad: con decimales solo cuando el valor es chico ($/g).
 export function pesosUnidad(n) {

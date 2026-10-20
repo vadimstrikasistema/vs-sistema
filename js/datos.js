@@ -16,6 +16,8 @@ export const estado = {
   piezas: {},       // id → ficha de pieza (con su stock de terminadas)
   horno: null,      // config/horno: energía, precios, capacidad, valor hora
   clientes: {},     // id → cliente (empresas y clientes finales)
+  ferias: {},       // id → feria
+  ventas: null,     // config/ventas: control de stock, comisiones
   proveedores: {},  // rut sin puntos → proveedor, con lo aprendido de sus facturas
   listo: false
 };
@@ -96,6 +98,12 @@ export function escuchar() {
     estado.piezas = m;
     avisar();
   }, errorEscucha));
+  desuscribir.push(onSnapshot(collection(db, 'ferias'), (qs) => {
+    const m = {};
+    qs.forEach((d) => { m[d.id] = { id: d.id, ...d.data() }; });
+    estado.ferias = m;
+    avisar();
+  }, errorEscucha));
   desuscribir.push(onSnapshot(collection(db, 'clientes'), (qs) => {
     const m = {};
     qs.forEach((d) => { m[d.id] = { id: d.id, ...d.data() }; });
@@ -140,6 +148,10 @@ export function enviar(promesa, { alGuardar, alFallar } = {}) {
 // ---------- Guardado de configuración ----------
 export function guardarEmpresa(datos) {
   return setDoc(doc(db, 'config', 'empresa'), { ...datos, ...firma() }, { merge: true });
+}
+
+export function guardarVentas(datos) {
+  return setDoc(doc(db, 'config', 'ventas'), { ...datos, ...firma() }, { merge: true });
 }
 
 export function guardarHorno(datos) {

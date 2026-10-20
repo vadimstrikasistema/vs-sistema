@@ -50,7 +50,7 @@ function pasos() {
 }
 
 // Resumen de gastos: se escucha mientras Inicio está abierto.
-const resumenGastos = { porClasificar: [], porPagar: [], alertas: [], lotes: [], porCobrar: [] };
+const resumenGastos = { porClasificar: [], porPagar: [], alertas: [], lotes: [], porCobrar: [], ventasHoy: [] };
 function gastos() {
   const pend = resumenGastos.porClasificar.filter((g) => !g.anulado);
   const pp = resumenGastos.porPagar.filter((g) => !g.anulado);
@@ -68,6 +68,20 @@ function gastos() {
             ${vencidas.length ? item(pesos(vencidas.reduce((s, g) => s + (g.total || 0), 0)), `Vencido (${vencidas.length})`, '#/gastos/por-pagar', true) : ''}
             ${alertas.length ? item(alertas.length, 'Alertas de precio sin revisar', '#/gastos/alertas', true) : ''}
           </ul>
+        </section>`;
+}
+
+function ventasHoy() {
+  const vs = resumenGastos.ventasHoy.filter((v) => !v.anulado);
+  const total = vs.reduce((s, v) => s + (v.total || 0), 0);
+  const sinBoleta = vs.filter((v) => !v.boleta?.emitida).length;
+  return `
+        <section class="panel">
+          <div class="panel-cabecera"><h2>Ventas de hoy</h2><a href="#/ventas/venta-rapida" class="btn btn-primario btn-chico">Vender</a></div>
+          ${vs.length ? `<ul class="lista-bajos">
+            <li><a href="#/ventas/historial">${vs.length} venta${vs.length > 1 ? 's' : ''}, ${vs.reduce((s, v) => s + (v.piezas || 0), 0)} piezas</a><span>${pesos(total)}</span></li>
+            ${sinBoleta ? `<li><a href="#/ventas/venta-rapida">Sin boleta</a><span class="texto-alerta">${sinBoleta}</span></li>` : ''}
+          </ul>` : '<p class="texto-suave">Todavía no hay ventas hoy.</p>'}
         </section>`;
 }
 
@@ -161,6 +175,8 @@ export default {
           </ol>
         </section>
 
+        ${ventasHoy()}
+
         ${cobranza()}
 
         ${taller()}
@@ -174,7 +190,7 @@ export default {
           <ol class="fases">
             <li class="fase-hecha"><strong>Base</strong><span>Acceso, configuración y listas.</span></li>
             <li class="fase-hecha"><strong>Producción, inventario y gastos</strong><span>Insumos, recetas y bodega; gastos con XML o a mano que suman stock; piezas, lotes por etapa con mermas y quemas.</span></li>
-            <li class="fase-actual"><strong>Ventas y cobranza</strong><span>Ya están clientes y cobranza (3a). Siguen venta rápida y ferias (3b), y órdenes de venta, consignación y facturación en el SII (3c).</span></li>
+            <li class="fase-actual"><strong>Ventas y cobranza</strong><span>Ya están clientes y cobranza (3a), y venta rápida, ferias y análisis (3b). Siguen órdenes de venta, consignación y facturación en el SII (3c).</span></li>
             <li><strong>Agenda y clases</strong><span>Calendario de quemas, ferias, clases, entregas y compromisos de pago.</span></li>
           </ol>
         </section>`;
@@ -186,7 +202,8 @@ export default {
       escucharDonde('gastos', 'pagoEstado', '==', 'por-pagar', (l) => { resumenGastos.porPagar = l; pintar(); }),
       escucharDonde('alertasPrecio', 'visto', '==', false, (l) => { resumenGastos.alertas = l; pintar(); }),
       escucharDonde('lotes', 'estado', '==', 'en-proceso', (l) => { resumenGastos.lotes = l; pintar(); }),
-      escucharDonde('facturas', 'abierta', '==', true, (l) => { resumenGastos.porCobrar = l; pintar(); })
+      escucharDonde('facturas', 'abierta', '==', true, (l) => { resumenGastos.porCobrar = l; pintar(); }),
+      escucharDonde('ventas', 'fecha', '==', hoyISO(), (l) => { resumenGastos.ventasHoy = l; pintar(); })
     ];
     return () => des.forEach((u) => u());
   }

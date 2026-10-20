@@ -7,7 +7,7 @@ Sistema de gestión del taller de cerámica Vadim Strika: producción por etapas
 - **Datos:** Firebase Firestore (plan gratuito Spark), con caché local para trabajar sin señal.
 - **Acceso:** Firebase Authentication con correo y contraseña, más una lista de correos permitidos.
 
-Versión actual: **0.5.0** (Fase 3, entrega 3a: clientes y cobranza).
+Versión actual: **0.6.0** (Fase 3, entrega 3b: venta rápida, ferias y análisis).
 
 ---
 
@@ -90,6 +90,7 @@ Estas decisiones se respetan en todas las fases:
 - **Piezas y lotes:** una ficha dice con qué se hace una pieza; su costo es un estimado con los precios de hoy. Un lote es una tanda real: al crearlo descuenta la pasta y suma las horas; en el secado se anotan las grietas y la arcilla puede volver a bodega; al esmaltar descuenta el esmalte; al terminar descuenta los otros insumos (embalaje) solo por las piezas buenas y suma las piezas a stock. Las piezas que se pierden reparten su costo entre las que quedan, así el costo por pieza es el real del taller.
 - **Quemas:** se registran al abrir el horno, con los lotes que iban y lo que salió. Su costo (kWh, horas × potencia, kg de gas o costo directo; si no hay dato, el estimado) se reparte según los puntos: S 1, M 2, L 4, XL 8. Una quema registrada no se modifica.
 - **Cobranza:** cada factura emitida queda por cobrar desde su XML o a mano; si el cliente no existe se crea con los datos del XML. El vencimiento sale del XML o del plazo de pago del cliente. Un pago se reparte entre las facturas del cliente, de la más antigua a la más nueva, y puede cubrir varias o parte de una. Una nota de crédito descuenta de la factura que corrige. Los pagos solo se anulan; una factura con pagos no se puede anular hasta anular sus pagos.
+- **Ventas directas:** pieza por pieza, con canal, feria, medio de pago, boleta y folio. Si la pieza tiene ficha, se descuenta del stock (primera o segunda). Con el control de stock apagado se vende igual y el stock puede quedar negativo hasta el conteo de piezas. Cada venta guarda el costo de lo vendido (costo real del último lote o el estimado de la ficha) y la comisión del medio de pago. Las ventas no se modifican: se anota la boleta o se anulan, y la anulación devuelve las piezas.
 - **Movimientos inmutables:** las reglas de Firestore no dejan cambiar un movimiento; solo marcarlo como anulado, y la anulación crea el movimiento contrario.
 
 ## Estructura de datos
@@ -115,6 +116,9 @@ Estas decisiones se respetan en todas las fases:
 | `clientes` | uno por cliente | `tipo` (empresa o persona), `rut`, `rutLimpio`, `razonSocial`, `nombre` (del local), `giro`, `direccion`, `comuna`, `contacto`, `whatsapp`, `correo`, `instagram`, `condicionDias` (plazo de pago), `ultimoRecordatorio`, `notas`, `archivado` |
 | `facturas` | una por documento emitido (cuenta por cobrar) | `origen` (xml o manual), `tipoDoc` (33, 34, 61, 0 sin documento), `folio`, `fecha`, `mes`, `vencimiento`, cliente, `neto`, `iva`, `total`, `lineas`, `referencias`, `pagado`, `estado` (pendiente, parcial, pagada, anulada, nota-credito), `abierta`, `aplicadaA` en notas de crédito |
 | `pagos` | uno por pago recibido | cliente, `fecha`, `medio`, `referencia`, `monto`, `aplicaciones[]` (factura y monto), `tipo` (pago o nota-credito), `anulado` |
+| `ventas` | una por venta directa | `fecha`, `mes`, `hora`, `canal`, `feriaId`, `medio`, cliente, `lineas[]` (pieza o sin ficha, `calidad`, cantidad, precio con IVA, `costoUnitario`), `descuento`, `total`, `neto`, `iva`, `comision`, `costo`, `boleta` (`emitida`, `folio`), `movs` (salidas de piezas), `anulado` |
+| `ferias` | una por feria | `nombre`, `lugar`, `fechaInicio`, `fechaFin`, `costoPuesto`, `otrosCostos`, `notas`, `cerrada` |
+| `config` | `ventas` | `controlarStock`, `comisiones` por medio de pago, `recordarBoleta` |
 | `alertasPrecio` | una por cambio de precio de 10 % o más | insumo, costo anterior y nuevo, variación, proveedor, documento, recetas afectadas, `visto` |
 
 Listas iniciales: tipos de insumo, unidades, categorías de pieza, canales de venta, medios de pago, áreas del negocio, ítems de gasto, motivos de merma y motivos de ajuste de inventario.
@@ -149,11 +153,22 @@ fonts/, img/            tipografías y logo (incluidos para funcionar sin señal
    - **2c** · fichas de pieza (pasta, esmalte, horas, tamaño S, M, L, XL en el horno) con costo y margen, lotes por etapa con mermas y reciclaje de arcilla, quemas con horno eléctrico o a gas y costo repartido, piezas de primera y de segunda, inventario de piezas con ajustes. ✔ Pendiente: fotos de las piezas (requiere decidir dónde guardarlas) y quemas programadas en la Agenda (fase 4).
 3. **Ventas y cobranza**, en tres entregas:
    - **3a** · clientes y cobranza: facturas emitidas desde el XML o a mano, notas de crédito, pagos en efectivo o transferencia, recordatorios por WhatsApp y estado de cuenta en PDF. ✔
-   - **3b** · venta rápida y ferias, también sin señal, con boleta y folio; vender sin inventario cargado hasta enero.
+   - **3b** · venta rápida pieza por pieza, también sin señal, con boleta y folio, cierre del día, ferias con su resultado, historial y análisis; vender sin inventario cargado hasta enero. ✔
    - **3c** · órdenes de venta, consignaciones con liquidación y facturación con el favorito del facturador del SII, conectadas con la cobranza.
 4. **Agenda y clases** · calendario con quemas, ferias, clases, entregas y compromisos de pago.
 
 ## Historial de versiones
+
+### 0.6.0 · Fase 3, entrega 3b: venta rápida, ferias y análisis
+- **Ventas → Venta rápida:** grilla de piezas con búsqueda y categorías, «Otra pieza» para lo que no tiene ficha, carrito con cantidades, primera o segunda (con su precio), precio editable y descuento; medio de pago con su comisión; cliente final opcional; boleta y folio; otra fecha para pasar ventas del cuaderno. Funciona sin señal.
+- **Ventas de hoy** y **Cierre del día:** total por medio de pago para cuadrar la caja, piezas vendidas y las ventas sin boleta para anotar sus folios.
+- **Ventas → Ferias:** fechas, lugar, puesto y otros costos; resultado (ventas sin IVA menos costo de piezas, comisiones y costos), ventas por día y por hora, lo más vendido, «Vender aquí» y cierre.
+- **Ventas → Historial** por día y **Análisis** del mes: por canal, por medio de pago, lo más vendido, por hora, ticket promedio y margen.
+- **Configuración → Ventas:** controlar stock (apagado hasta cargar el inventario), comisión por medio de pago, recordar boletas.
+- **Inicio:** ventas de hoy y las que quedaron sin boleta.
+- Los montos negativos se muestran como −$.
+- **Reglas de Firestore nuevas** para ventas, ferias y la configuración de ventas. **Hay que volver a publicarlas.**
+- Estructura de datos versión 6.
 
 ### 0.5.0 · Fase 3, entrega 3a: clientes y cobranza
 - **Ventas → Clientes:** empresas y profesionales (RUT, razón social, nombre del local, giro, contacto, WhatsApp, plazo de pago) y clientes finales (nombre, Instagram, notas).

@@ -1,18 +1,20 @@
 // Configuración: datos de la empresa, costeo, listas editables y sistema.
 import {
-  estado, alCambiar, enviar, guardarEmpresa, guardarCosteo, guardarHorno,
+  estado, alCambiar, enviar, guardarEmpresa, guardarCosteo, guardarHorno, guardarVentas, itemsActivos,
   validarNombre, agregarItem, renombrarItem, cambiarVisibilidad, moverItem
 } from '../datos.js';
 import { auth } from '../firebase.js';
 import { APP_VERSION, SCHEMA_VERSION, CORREOS_PERMITIDOS } from '../config.js';
 import { esc, info, toast, dialogo, $, $$, rutValido, formatearRut, leerNumero, numero, pesos } from '../ui.js';
 import { horno as configHorno, TAMANOS, costoQuemaEstimado, costoPorPunto } from '../piezas-core.js';
+import { configVentas } from '../ventas-core.js';
 import { ICONOS } from '../iconos.js';
 
 const PESTANAS = [
   ['empresa', 'Empresa'],
   ['costeo', 'Costeo'],
   ['horno', 'Horno y trabajo'],
+  ['ventas', 'Ventas'],
   ['listas', 'Listas'],
   ['sistema', 'Sistema']
 ];
@@ -36,7 +38,7 @@ export default {
       </nav>
       <div id="conf-cuerpo"></div>`;
     const cuerpo = $('#conf-cuerpo', el);
-    const secciones = { empresa, costeo, horno, listas, sistema };
+    const secciones = { empresa, costeo, horno, ventas, listas, sistema };
     return secciones[pestana](cuerpo);
   }
 };
@@ -265,6 +267,49 @@ function horno(el) {
       if (d.hornos.some((x) => !(x.capacidadPuntos > 0))) { toast('La capacidad de cada horno debe ser mayor que cero.', 'error'); return; }
       sucio = false;
       enviar(guardarHorno(d), { alGuardar: avisoGuardado('Horno y trabajo'), alFallar: avisoError });
+    });
+  };
+  pintar();
+  return alCambiar(pintar);
+}
+
+// ---------------------------------------------------------------- Ventas
+function ventas(el) {
+  let sucio = false;
+  const pintar = () => {
+    if (sucio) return;
+    const v = configVentas();
+    el.innerHTML = `
+      <form class="panel formulario" id="form-ventas" novalidate>
+        <h2>Stock de piezas</h2>
+        <label class="interruptor"><input type="checkbox" name="controlarStock" ${v.controlarStock ? 'checked' : ''}><span>Controlar stock al vender</span></label>
+        <p class="texto-suave">${info('Encendido: la venta rápida muestra cuántas quedan y no deja vender más de lo que hay. Apagado: se vende igual aunque el stock no esté cargado; las ventas se descuentan y el stock puede quedar negativo hasta que hagas el conteo de piezas.')} Déjalo apagado mientras no esté cargado el inventario de piezas terminadas.</p>
+
+        <h2 class="separado">Comisiones por medio de pago</h2>
+        <p class="texto-suave">El porcentaje que cobra la máquina o la plataforma en cada venta. Se descuenta en el resultado de las ferias y en el análisis. Para agregar o renombrar medios de pago (por ejemplo, «Débito SumUp»), ve a Listas.</p>
+        <div class="campos">
+          ${itemsActivos('mediosPago').map((m) => `<label class="campo"><span class="campo-etiqueta">${esc(m.nombre)}</span>
+            <span class="con-sufijo"><input name="com-${esc(m.id)}" data-medio="${esc(m.id)}" inputmode="decimal" value="${v.comisiones?.[m.id] ? numero(v.comisiones[m.id], 2) : ''}" placeholder="0"><span class="sufijo">%</span></span></label>`).join('')}
+        </div>
+
+        <h2 class="separado">Boletas</h2>
+        <label class="interruptor"><input type="checkbox" name="recordarBoleta" ${v.recordarBoleta ? 'checked' : ''}><span>Recordar las ventas sin boleta</span></label>
+        <p class="texto-suave">Cada venta lleva si se emitió boleta y su folio. Con esto encendido, la venta rápida avisa cuando una venta queda sin boleta, y el cierre del día las lista.</p>
+        <div class="formulario-pie"><button class="btn btn-primario" type="submit">Guardar</button></div>
+      </form>`;
+    const f = $('#form-ventas', el);
+    f.addEventListener('input', () => { sucio = true; });
+    f.addEventListener('change', () => { sucio = true; });
+    f.addEventListener('submit', (ev) => {
+      ev.preventDefault();
+      const comisiones = {};
+      for (const i of $$('[data-medio]', f)) {
+        const n = i.value.trim() ? leerNumero(i.value) : 0;
+        if (!(n >= 0 && n < 50)) { toast('Cada comisión debe ser un porcentaje entre 0 y 50.', 'error'); return; }
+        if (n) comisiones[i.dataset.medio] = n;
+      }
+      sucio = false;
+      enviar(guardarVentas({ controlarStock: f.controlarStock.checked, recordarBoleta: f.recordarBoleta.checked, comisiones }), { alGuardar: avisoGuardado('Configuración de ventas'), alFallar: avisoError });
     });
   };
   pintar();

@@ -27,7 +27,7 @@ service cloud.firestore {
     match /config/{docId} {
       allow read: if permitido();
       allow create, update: if permitido() && firmado()
-        && docId in ['sistema', 'empresa', 'costeo', 'horno'];
+        && docId in ['sistema', 'empresa', 'costeo', 'horno', 'ventas'];
       allow delete: if false;
     }
 
@@ -178,13 +178,34 @@ service cloud.firestore {
       allow delete: if false;
     }
 
+    // Ventas directas: no se modifican; solo se anota la boleta, el cliente o se anulan.
+    match /ventas/{id} {
+      allow read: if permitido();
+      allow create: if permitido() && firmado()
+        && request.resource.data.lineas is list
+        && request.resource.data.total is number
+        && request.resource.data.anulado == false;
+      allow update: if permitido() && firmado()
+        && resource.data.anulado == false
+        && request.resource.data.diff(resource.data).affectedKeys()
+             .hasOnly(['boleta', 'clienteId', 'clienteNombre', 'anulado', 'motivoAnulacion', 'anuladoEn', 'actualizado', 'actualizadoPor']);
+      allow delete: if false;
+    }
+
+    // Ferias: se editan y se cierran.
+    match /ferias/{id} {
+      allow read: if permitido();
+      allow create, update: if permitido() && firmado() && request.resource.data.nombre is string;
+      allow delete: if false;
+    }
+
     // Colecciones de las fases siguientes (insumos, piezas, ventas, gastos…).
     // Se leen y escriben solo con permiso; nunca se borran.
     // (Excluye las colecciones de arriba para no saltarse sus reglas:
     // en Firestore basta que una regla permita para que se permita.)
     match /{coleccion}/{docId} {
       allow read: if permitido();
-      allow create, update: if permitido() && !(coleccion in ['config', 'listas', 'insumos', 'recetas', 'movimientos', 'preparaciones', 'conteos', 'gastos', 'proveedores', 'alertasPrecio', 'piezas', 'lotes', 'quemas', 'movPiezas', 'clientes', 'facturas', 'pagos']);
+      allow create, update: if permitido() && !(coleccion in ['config', 'listas', 'insumos', 'recetas', 'movimientos', 'preparaciones', 'conteos', 'gastos', 'proveedores', 'alertasPrecio', 'piezas', 'lotes', 'quemas', 'movPiezas', 'clientes', 'facturas', 'pagos', 'ventas', 'ferias']);
       allow delete: if false;
     }
   }

@@ -688,3 +688,58 @@ h2.separado { margin-top: 18px; }
   .deudor-acciones { justify-content: stretch; }
   .deudor-acciones .btn { flex: 1 1 auto; }
 }
+
+/* ============================================================ Entrega 3b: venta rápida y ferias */
+.vr-contexto { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; padding: 14px 16px; }
+.vr { display: grid; gap: 16px; align-items: start; }
+@media (min-width: 1100px) { .vr { grid-template-columns: 1fr 360px; } .vr-carrito { position: sticky; top: 16px; } }
+.vr-grilla { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 10px; }
+.vr-ayuda { grid-column: 1 / -1; }
+.vr-pieza { position: relative; display: flex; flex-direction: column; align-items: flex-start; gap: 4px; min-height: 96px; padding: 12px; background: var(--papel); border: 1px solid var(--borde); border-radius: var(--r); text-align: left; cursor: pointer; color: var(--tinta); }
+.vr-pieza:hover { border-color: var(--cobalto); }
+.vr-pieza:active { transform: scale(0.98); }
+.vr-pieza.en-carrito { border-color: var(--cobalto); box-shadow: 0 0 0 1px var(--cobalto); }
+.vr-pieza-nombre { font-weight: 600; line-height: 1.25; }
+.vr-pieza-precio { font-variant-numeric: tabular-nums; }
+.vr-pieza-stock { font-size: 0.78rem; color: var(--tinta-tenue); margin-top: auto; }
+.vr-pieza-cuenta { position: absolute; top: 8px; right: 8px; min-width: 24px; height: 24px; padding: 0 6px; display: grid; place-items: center; border-radius: 12px; background: var(--cobalto); color: #fff; font-size: 0.8rem; font-weight: 600; }
+.vr-otra { border-style: dashed; color: var(--tinta-suave); }
+.vr-otra svg { width: 18px; height: 18px; }
+.vr-carrito { display: flex; flex-direction: column; gap: 12px; margin: 0; scroll-margin-top: 72px; }
+.vr-carrito > h2 { margin: 0; }
+.vr-lineas { list-style: none; margin: 0; padding: 0; }
+.vr-lineas li { padding: 8px 0; border-top: 1px solid var(--borde); }
+.vr-linea-cabeza { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.vr-linea-nombre { font-weight: 500; }
+.vr-linea-datos { display: grid; grid-template-columns: auto auto 1fr auto; gap: 8px; align-items: center; margin-top: 4px; }
+.vr-cant { display: inline-flex; align-items: center; gap: 2px; border: 1px solid var(--borde-fuerte); border-radius: 999px; padding: 0 2px; }
+.vr-cant span { min-width: 22px; text-align: center; font-weight: 600; }
+.vr-cant .btn-icono { width: 34px; height: 34px; font-size: 1.1rem; }
+.vr-calidad { min-width: 38px; height: 34px; border-radius: 999px; border: 1px solid var(--borde-fuerte); background: #fff; font-weight: 600; cursor: pointer; }
+.vr-calidad.segunda { background: var(--ocre-claro); border-color: var(--ocre); color: var(--ocre-osc); }
+.vr-precio input { width: 100%; min-width: 0; min-height: 36px; padding: 4px 28px 4px 8px; border: 1px solid var(--borde-fuerte); border-radius: var(--r-chico); }
+.vr-precio .sufijo { right: 8px; }
+.vr-subtotal { font-weight: 600; font-variant-numeric: tabular-nums; min-width: 72px; text-align: right; }
+.vr-totales { display: flex; flex-direction: column; gap: 6px; padding-top: 8px; border-top: 1px solid var(--borde-fuerte); }
+.vr-descuento { display: flex; justify-content: space-between; align-items: center; gap: 12px; font-size: 0.92rem; color: var(--tinta-suave); }
+.vr-descuento .con-sufijo { width: 130px; }
+.vr-descuento input { width: 100%; min-height: 36px; padding: 4px 28px 4px 8px; border: 1px solid var(--borde-fuerte); border-radius: var(--r-chico); }
+.vr-total { display: flex; justify-content: space-between; align-items: baseline; font-size: 1.1rem; }
+.vr-total strong { font-size: 1.5rem; font-variant-numeric: tabular-nums; }
+.vr-extras { grid-template-columns: 1fr !important; }
+.vr-boleta { display: flex; align-items: center; gap: 10px; min-height: 40px; }
+.vr-boleta input[data-folio] { width: 120px; min-height: 38px; padding: 4px 10px; border: 1px solid var(--borde-fuerte); border-radius: var(--r-chico); }
+.vr-recordar { font-size: 0.82rem; margin-top: -4px; }
+.vr-barra { position: fixed; z-index: 24; left: 12px; right: 12px; bottom: calc(var(--barra-inf) + var(--seguro-inf) + 10px); display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 10px 12px 10px 16px; background: var(--carbon); color: var(--loza); border-radius: 999px; font-weight: 600; }
+@media (min-width: 1100px) { .vr-barra { display: none !important; } }
+@media (min-width: 900px) and (max-width: 1099px) { .vr-barra { left: calc(var(--lateral) + 24px); bottom: 20px; } }
+.seccion-cabecera { margin-top: 24px; }
+.seccion-cabecera h2 { font-size: 1.05rem; }
+.input-folio { width: 110px; min-height: 36px; padding: 4px 8px; border: 1px solid var(--borde-fuerte); border-radius: var(--r-chico); text-align: right; }
+.columnas-hora { height: 160px; }
+.vr-linea-datos { grid-template-columns: auto auto minmax(96px, 1fr) auto; }
+.vr-precio input { padding-right: 22px; text-align: right; }
+.vr-precio .sufijo { right: 6px; }
+.vr-pieza-nombre { padding-right: 26px; }
+.vr-barra .btn { text-decoration: none; }
+@media (max-width: 400px) { .vr-subtotal { min-width: 64px; font-size: 0.92rem; } .vr-cant .btn-icono { width: 30px; } }

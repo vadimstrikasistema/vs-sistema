@@ -6,29 +6,37 @@ import { nuevoLote, refNueva, refDoc } from '../stock.js';
 import { pestanas, vacio, avisoError, avisoGuardado } from '../comunes.js';
 import { CONDICIONES, nombreCliente, clientePorRut } from '../cobranza-core.js';
 import { ICONOS } from '../iconos.js';
+import { vistaVentaRapida, vistaHistorial, vistaFerias, vistaAnalisis } from './venta-rapida.js';
 
-const PEST = [['clientes', 'Clientes'], ['venta-rapida', 'Venta rápida'], ['ordenes', 'Órdenes y consignación']];
+const PEST = [['venta-rapida', 'Venta rápida'], ['historial', 'Historial'], ['ferias', 'Ferias'], ['analisis', 'Análisis'], ['clientes', 'Clientes'], ['ordenes', 'Órdenes y consignación']];
 const fallo = avisoError(toast);
 const norm = (t) => String(t || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
 
 export default {
   render(el, { sub }) {
-    const actual = PEST.some(([k]) => k === sub) ? sub : 'clientes';
+    const actual = PEST.some(([k]) => k === sub) ? sub : 'venta-rapida';
     el.innerHTML = `
       <header class="pagina-cabecera">
         <h1>Ventas</h1>
-        <p class="pagina-bajada">${actual === 'clientes'
-          ? 'Tiendas, cafeterías y profesionales a los que facturas, y clientes finales que quieres recordar.'
-          : actual === 'venta-rapida' ? 'Ventas en feria, en el taller o por Instagram.' : 'Órdenes de venta a empresas y piezas en consignación.'}</p>
+        <p class="pagina-bajada">${{
+          clientes: 'Tiendas, cafeterías y profesionales a los que facturas, y clientes finales que quieres recordar.',
+          'venta-rapida': 'Ventas en feria, en el taller o por Instagram, pieza por pieza. Funciona sin señal.',
+          historial: 'Todas las ventas directas, día por día.',
+          ferias: 'Cada feria con sus fechas, costos y resultado.',
+          analisis: 'Qué se vende, dónde, cómo se paga y a qué hora.',
+          ordenes: 'Órdenes de venta a empresas y piezas en consignación.'
+        }[actual]}</p>
       </header>
       ${pestanas('ventas', PEST, actual)}
       <div id="ven-cuerpo"></div>`;
     const c = $('#ven-cuerpo', el);
     if (actual === 'clientes') return vistaClientes(c);
-    const pend = actual === 'venta-rapida'
-      ? ['Venta rápida con la lista de piezas, canal y medio de pago, también sin señal', 'Ferias: ventas por día y por hora, costo del puesto y resultado', 'Si se emitió boleta y su folio, con aviso al cerrar el día de las que faltan', 'Cliente final opcional, para ir conociendo a quienes compran']
-      : ['Órdenes de venta con PDF y WhatsApp, con el precio a tiendas de cada pieza', 'Consignación: entrega, liquidación, lo no vendido sigue en la tienda o vuelve al taller', 'Por facturar y favorito que rellena el facturador gratuito del SII con la referencia a la orden', 'Cada factura pasa sola a Cobranza'];
-    c.innerHTML = `<section class="panel pendiente"><p class="pendiente-fase">Llega en la entrega ${actual === 'venta-rapida' ? '3b' : '3c'}</p>
+    if (actual === 'venta-rapida') return vistaVentaRapida(c);
+    if (actual === 'historial') return vistaHistorial(c);
+    if (actual === 'ferias') return vistaFerias(c);
+    if (actual === 'analisis') return vistaAnalisis(c);
+    const pend = ['Órdenes de venta con PDF y WhatsApp, con el precio a tiendas de cada pieza', 'Consignación: entrega, liquidación, lo no vendido sigue en la tienda o vuelve al taller', 'Por facturar y favorito que rellena el facturador gratuito del SII con la referencia a la orden', 'Cada factura pasa sola a Cobranza'];
+    c.innerHTML = `<section class="panel pendiente"><p class="pendiente-fase">Llega en la entrega 3c</p>
       <ul class="lista-puntos">${pend.map((x) => `<li>${esc(x)}</li>`).join('')}</ul></section>`;
     return null;
   }
