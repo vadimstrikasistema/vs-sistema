@@ -224,6 +224,8 @@ body.modo-login { background: var(--loza); }
   .lateral-usuario { color: var(--menu-tinta); opacity: .75; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .contenido { margin-left: var(--lateral); padding: 44px 48px 64px; }
 }
+/* En pantallas anchas el contenido usa más espacio (sin estirarse sin límite: las líneas muy largas cuestan de leer). */
+@media (min-width: 1200px) { .contenido { max-width: 1360px; } }
 
 /* ------------------------------------------------------------ Páginas */
 .pagina-cabecera { display: flex; flex-direction: column; gap: 6px; margin-bottom: 24px; }
