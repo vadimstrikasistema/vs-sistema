@@ -17,6 +17,7 @@ export const estado = {
   horno: null,      // config/horno: energía, precios, capacidad, valor hora
   clientes: {},     // id → cliente (empresas y clientes finales)
   ferias: {},       // id → feria
+  cobranza: null,   // config/cobranza: plazos y plantillas de mensajes
   ventas: null,     // config/ventas: control de stock, comisiones
   ordenes: {},      // id → orden de venta a empresas
   consignaciones: {}, // id → entrega en consignación
@@ -177,6 +178,10 @@ export function guardarEmpresa(datos) {
   return setDoc(doc(db, 'config', 'empresa'), { ...datos, ...firma() }, { merge: true });
 }
 
+export function guardarCobranza(datos) {
+  return setDoc(doc(db, 'config', 'cobranza'), { ...datos, ...firma() }, { merge: true });
+}
+
 export function guardarVentas(datos) {
   return setDoc(doc(db, 'config', 'ventas'), { ...datos, ...firma() }, { merge: true });
 }
@@ -199,6 +204,7 @@ export function itemsActivos(clave) {
 
 // Nombre de un ítem por su id (incluye ocultos, para mostrar registros antiguos).
 export function nombreItem(clave, id) {
+  if (clave === 'mediosPago' && id === 'por-cobrar') return 'Queda debiendo';
   return estado.listas[clave]?.items.find((i) => i.id === id)?.nombre ?? id;
 }
 

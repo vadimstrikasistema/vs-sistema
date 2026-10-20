@@ -1,6 +1,6 @@
 // Configuración: datos de la empresa, costeo, listas editables y sistema.
 import {
-  estado, alCambiar, enviar, guardarEmpresa, guardarCosteo, guardarHorno, guardarVentas, itemsActivos,
+  estado, alCambiar, enviar, guardarEmpresa, guardarCosteo, guardarHorno, guardarVentas, guardarCobranza, itemsActivos,
   validarNombre, agregarItem, renombrarItem, cambiarVisibilidad, moverItem, cambiarColor
 } from '../datos.js';
 import { COLORES_AGENDA } from '../datos-iniciales.js';
@@ -9,6 +9,7 @@ import { APP_VERSION, SCHEMA_VERSION, CORREOS_PERMITIDOS } from '../config.js';
 import { esc, info, toast, dialogo, $, $$, rutValido, formatearRut, leerNumero, numero, pesos } from '../ui.js';
 import { horno as configHorno, TAMANOS, costoQuemaEstimado, costoPorPunto } from '../piezas-core.js';
 import { configVentas } from '../ventas-core.js';
+import { configCobranza, COBRANZA_INICIAL } from '../cobranza-gestion-core.js';
 import { ICONOS } from '../iconos.js';
 
 const PESTANAS = [
@@ -16,6 +17,7 @@ const PESTANAS = [
   ['costeo', 'Costeo'],
   ['horno', 'Horno y trabajo'],
   ['ventas', 'Ventas'],
+  ['cobranza', 'Cobranza'],
   ['listas', 'Listas'],
   ['sistema', 'Sistema']
 ];
@@ -39,7 +41,7 @@ export default {
       </nav>
       <div id="conf-cuerpo"></div>`;
     const cuerpo = $('#conf-cuerpo', el);
-    const secciones = { empresa, costeo, horno, ventas, listas, sistema };
+    const secciones = { empresa, costeo, horno, ventas, cobranza, listas, sistema };
     return secciones[pestana](cuerpo);
   }
 };
@@ -422,6 +424,46 @@ function listas(el) {
     }
   }
 
+  pintar();
+  return alCambiar(pintar);
+}
+
+// ---------------------------------------------------------------- Cobranza
+function cobranza(el) {
+  let sucio = false;
+  const PLANT = [['amable', '1. Amable', 'Cuando vence. Recuerda con cordialidad.'], ['firme', '2. Firme', 'Si no responde ni paga en los días de abajo.'], ['ultimo', '3. Último aviso', 'Si sigue sin respuesta. Pone un plazo.'], ['consignacion', 'Pedir liquidación', 'Para las tiendas con piezas en consignación.']];
+  const pintar = () => {
+    if (sucio) return;
+    const c = configCobranza();
+    el.innerHTML = `
+      <form class="panel formulario" id="form-cob" novalidate>
+        <h2>Plazos</h2>
+        <div class="campos">
+          <label class="campo"><span class="campo-etiqueta">Días entre un tono y el siguiente ${info('Si el cliente no paga ni responde en estos días, Cobranza y la Agenda sugieren el tono siguiente: amable → firme → último aviso → llamar o visitar. Una respuesta o una promesa reinician la cuenta.')}</span>
+            <span class="con-sufijo"><input name="diasEntreTonos" inputmode="numeric" value="${c.diasEntreTonos}"><span class="sufijo">días</span></span></label>
+          <label class="campo"><span class="campo-etiqueta">Avisar consignación sin visita ${info('Días desde la última entrega, liquidación o visita a una tienda con piezas en consignación. Pasado este plazo aparece en Cobranza y en la Agenda para pedir la liquidación.')}</span>
+            <span class="con-sufijo"><input name="diasConsignacion" inputmode="numeric" value="${c.diasConsignacion}"><span class="sufijo">días</span></span></label>
+        </div>
+        <h2 class="separado">Mensajes</h2>
+        <p class="texto-suave">Se completan solos con: <code>{nombre}</code> (el contacto), <code>{taller}</code>, <code>{detalle}</code> (lo que debe), <code>{total}</code>, <code>{dias}</code> (de atraso), <code>{plazo}</code> (en 5 días), <code>{transferencia}</code> (tus datos de transferencia). En el de consignación: <code>{piezas}</code> y <code>{desde}</code>.</p>
+        ${PLANT.map(([k, t, ayuda]) => `<label class="campo"><span class="campo-etiqueta">${t} <span class="texto-tenue">· ${ayuda}</span></span><textarea name="pl-${k}" rows="5">${esc(c.plantillas[k])}</textarea>
+          <button type="button" class="btn-enlace" data-restaurar="${k}">Volver al texto original</button></label>`).join('')}
+        <div class="formulario-pie"><button class="btn btn-primario" type="submit">Guardar</button></div>
+      </form>`;
+    const f = $('#form-cob', el);
+    f.addEventListener('input', () => { sucio = true; });
+    $$('[data-restaurar]', f).forEach((b) => b.addEventListener('click', () => { f.elements[`pl-${b.dataset.restaurar}`].value = COBRANZA_INICIAL.plantillas[b.dataset.restaurar]; sucio = true; }));
+    f.addEventListener('submit', (ev) => {
+      ev.preventDefault();
+      const d1 = Math.round(leerNumero(f.diasEntreTonos.value)); const d2 = Math.round(leerNumero(f.diasConsignacion.value));
+      if (!(d1 >= 1 && d1 <= 60)) { toast('Los días entre tonos deben estar entre 1 y 60.', 'error'); return; }
+      if (!(d2 >= 7 && d2 <= 180)) { toast('El aviso de consignación debe estar entre 7 y 180 días.', 'error'); return; }
+      const plantillas = {};
+      for (const [k] of PLANT) { const t = f.elements[`pl-${k}`].value.trim(); if (!t) { toast('Ningún mensaje puede quedar vacío.', 'error'); return; } plantillas[k] = t; }
+      sucio = false;
+      enviar(guardarCobranza({ diasEntreTonos: d1, diasConsignacion: d2, plantillas }), { alGuardar: avisoGuardado('Configuración de cobranza'), alFallar: avisoError });
+    });
+  };
   pintar();
   return alCambiar(pintar);
 }

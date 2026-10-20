@@ -67,6 +67,8 @@ export function registrarVenta(lote, { lineas, medio, canal, feriaId = null, cli
     ...(pagos ? { pagos, comision: pagos.reduce((x, p) => x + Math.round(p.monto * comisionDe(p.medio) / 100), 0) } : {}),
     ...(encargoId ? { encargoId } : {}),
     ...(cursoId ? { cursoId } : {}),
+    // «Queda debiendo»: la venta se registra completa y el cobro queda pendiente en Cobranza.
+    ...(medio === 'por-cobrar' ? { deuda: { saldo: t.total, pagos: [] }, deudaAbierta: true, comision: 0 } : {}),
     boleta: { emitida: Boolean(boleta?.emitida), folio: boleta?.folio || '' },
     nota, movs, anulado: false, ...firma()
   };
@@ -92,6 +94,22 @@ export function anularVenta(lote, v, motivo = '') {
   if (e) lote.update(refDoc('encargos', e.id), { estado: 'listo', ventaId: null, fechaEntregado: null, historial: [...(e.historial || []), { fecha: v.fecha, estado: 'listo' }], ...firma() });
 }
 
+export const POR_COBRAR = 'por-cobrar';
+
+// Pago (total o parcial) de una venta que quedó debiendo.
+export function pagarVenta(lote, v, { monto, medio, fecha }) {
+  const pagos = [...(v.deuda?.pagos || []), { fecha, monto, medio }];
+  const saldo = Math.max(0, (v.total || 0) - pagos.reduce((x, p) => x + p.monto, 0));
+  const cambios = {
+    deuda: { saldo, pagos }, deudaAbierta: saldo > 0, pagos,
+    comision: pagos.reduce((x, p) => x + Math.round(p.monto * comisionDe(p.medio) / 100), 0), ...firma()
+  };
+  if (saldo <= 0) cambios.medio = pagos.slice().sort((a, b) => b.monto - a.monto)[0].medio;
+  lote.update(refDoc('ventas', v.id), cambios);
+  Object.assign(v, cambios);
+  return saldo;
+}
+
 export function marcarBoleta(lote, v, folio) {
   lote.update(refDoc('ventas', v.id), { boleta: { emitida: true, folio: folio || '' }, ...firma() });
 }
@@ -103,7 +121,8 @@ export function resumenVentas(ventas) {
   const porMedio = new Map(); const porCanal = new Map(); const porPieza = new Map(); const porHora = new Map(); const porDia = new Map();
   vs.forEach((v) => {
     if (v.pagos?.length) v.pagos.forEach((p) => porMedio.set(p.medio, (porMedio.get(p.medio) || 0) + p.monto));
-    else porMedio.set(v.medio, (porMedio.get(v.medio) || 0) + v.total);
+    else if (!v.deuda) porMedio.set(v.medio, (porMedio.get(v.medio) || 0) + v.total);
+    if (v.deuda?.saldo > 0) porMedio.set(POR_COBRAR, (porMedio.get(POR_COBRAR) || 0) + v.deuda.saldo);
     porCanal.set(v.canal, (porCanal.get(v.canal) || 0) + v.total);
     porDia.set(v.fecha, (porDia.get(v.fecha) || 0) + v.total);
     const h = (v.hora || '00:00').slice(0, 2);

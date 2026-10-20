@@ -163,7 +163,8 @@ export function vistaVentaRapida(el) {
         ${t.comision ? `<p class="texto-tenue">Comisión de la máquina ${numero(comisionDe(carrito.medio), 2)} %: ${pesos(t.comision)}</p>` : ''}
       </div>
       <div class="campo"><span class="campo-etiqueta">Medio de pago</span>
-        <div class="segmentado segmentado-chico" role="radiogroup">${itemsActivos('mediosPago').map((m) => `<label><input type="radio" name="medio" value="${esc(m.id)}" ${m.id === carrito.medio ? 'checked' : ''}><span>${esc(m.nombre)}</span></label>`).join('')}</div></div>
+        <div class="segmentado segmentado-chico" role="radiogroup">${itemsActivos('mediosPago').map((m) => `<label><input type="radio" name="medio" value="${esc(m.id)}" ${m.id === carrito.medio ? 'checked' : ''}><span>${esc(m.nombre)}</span></label>`).join('')}<label><input type="radio" name="medio" value="por-cobrar" ${carrito.medio === 'por-cobrar' ? 'checked' : ''}><span>Queda debiendo</span></label></div>
+        ${carrito.medio === 'por-cobrar' ? `<p class="texto-tenue vr-recordar">La venta se registra y el cobro queda en Cobranza, con su seguimiento. ${info('Elige el cliente: así sabes quién te debe y puedes mandarle recordatorios por WhatsApp. Cuando pague, regístralo en Cobranza.')}</p>` : ''}</div>
       <div class="campos vr-extras">
         <label class="campo"><span class="campo-etiqueta">Cliente ${info('Opcional. Sirve para conocer a quienes compran y escribirles después. Crea clientes finales con nombre e Instagram.')}</span>
           <span class="con-boton"><select data-cliente><option value="">Sin cliente</option>${personas.map((c) => `<option value="${esc(c.id)}" ${c.id === carrito.clienteId ? 'selected' : ''}>${esc(nombreCliente(c))}</option>`).join('')}</select><button type="button" class="btn btn-suave btn-chico" data-nuevo-cliente>Nuevo</button></span></label>
@@ -209,6 +210,7 @@ export function vistaVentaRapida(el) {
     if (carrito.lineas.some((l) => !(l.precio > 0))) { toast('Hay piezas sin precio. Escribe el precio antes de registrar.', 'error'); return; }
     const fecha = inFecha.value || hoyISO();
     const cliente = carrito.clienteId ? { id: carrito.clienteId, nombre: nombreCliente(estado.clientes[carrito.clienteId]) } : null;
+    if (carrito.medio === 'por-cobrar' && !cliente) { toast('Para dejar una venta debiendo, elige el cliente.', 'error'); return; }
     const lote = nuevoLote();
     const v = registrarVenta(lote, {
       lineas: carrito.lineas, medio: carrito.medio, canal: selCanal.value, feriaId: selCanal.value === 'feria' ? selFeria.value || null : null,
@@ -254,7 +256,7 @@ const filaVenta = (v) => `
   <li><button class="fila ${v.anulado ? 'fila-anulada' : ''}" data-id="${esc(v.id)}">
     <span class="fila-principal"><span class="fila-nombre">${v.lineas.map((l) => `${l.cantidad > 1 ? `${l.cantidad} × ` : ''}${esc(l.nombre)}${l.calidad === 'segunda' ? ' (2ª)' : ''}`).join(', ')}</span>
       <span class="fila-meta"><span>${v.hora ? `${esc(v.hora)} · ` : ''}${esc(nombreItem('mediosPago', v.medio))}${v.clienteNombre ? ` · ${esc(v.clienteNombre)}` : ''}</span>
-        ${v.anulado ? '<span class="etiqueta etiqueta-suave">Anulada</span>' : v.boleta?.emitida ? `<span class="etiqueta etiqueta-ok">Boleta ${esc(v.boleta.folio || '')}</span>` : '<span class="etiqueta etiqueta-alerta">Sin boleta</span>'}</span></span>
+        ${v.deuda?.saldo > 0 && !v.anulado ? `<span class="etiqueta etiqueta-alerta">Debe ${pesos(v.deuda.saldo)}</span>` : ''}${v.anulado ? '<span class="etiqueta etiqueta-suave">Anulada</span>' : v.boleta?.emitida ? `<span class="etiqueta etiqueta-ok">Boleta ${esc(v.boleta.folio || '')}</span>` : '<span class="etiqueta etiqueta-alerta">Sin boleta</span>'}</span></span>
     <span class="fila-dato fila-dato-fuerte"><span class="fila-etq">Total</span>${pesos(v.total)}</span>
   </button></li>`;
 

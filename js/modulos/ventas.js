@@ -1,5 +1,5 @@
-// Ventas: venta rápida y ferias (clientes finales), órdenes de venta,
-// consignación y facturación (empresas), y la ficha de clientes.
+// Ventas a personas: venta rápida, encargos, ferias, historial, clientes finales y análisis.
+// Las ventas a empresas están en el módulo Empresas.
 import { estado, alCambiar, enviar, firma } from '../datos.js';
 import { esc, info, toast, $, $$, formulario, rutValido, formatearRut, limpiarRut, fechaCorta } from '../ui.js';
 import { nuevoLote, refNueva, refDoc } from '../stock.js';
@@ -7,68 +7,65 @@ import { pestanas, vacio, avisoError, avisoGuardado } from '../comunes.js';
 import { CONDICIONES, nombreCliente, clientePorRut } from '../cobranza-core.js';
 import { ICONOS } from '../iconos.js';
 import { vistaVentaRapida, vistaHistorial, vistaFerias, vistaAnalisis } from './venta-rapida.js';
-import { vistaOrdenes, vistaConsignacion, vistaPorFacturar } from './ventas-b2b.js';
 import { vistaEncargos } from './encargos.js';
 
-const PEST = [['venta-rapida', 'Venta rápida'], ['encargos', 'Encargos'], ['historial', 'Historial'], ['ferias', 'Ferias'], ['analisis', 'Análisis'], ['ordenes', 'Órdenes'], ['consignacion', 'Consignación'], ['por-facturar', 'Por facturar'], ['clientes', 'Clientes']];
+const PEST = [['venta-rapida', 'Venta rápida'], ['encargos', 'Encargos'], ['ferias', 'Ferias'], ['historial', 'Historial'], ['clientes', 'Clientes'], ['analisis', 'Análisis']];
+const DE_EMPRESAS = ['ordenes', 'consignacion', 'por-facturar'];
 const fallo = avisoError(toast);
 const norm = (t) => String(t || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
 
 export default {
   render(el, { sub }) {
+    // Las pestañas de empresas se mudaron a su propio módulo.
+    if (DE_EMPRESAS.includes(sub)) { location.replace(`#/empresas/${sub}`); return null; }
     const actual = PEST.some(([k]) => k === sub) ? sub : 'venta-rapida';
     el.innerHTML = `
       <header class="pagina-cabecera">
         <h1>Ventas</h1>
         <p class="pagina-bajada">${{
-          clientes: 'Tiendas, cafeterías y profesionales a los que facturas, y clientes finales que quieres recordar.',
+          clientes: 'Las personas que te compran, encargan o toman clases. Las tiendas están en Empresas.',
           'venta-rapida': 'Ventas en feria, en el taller o por Instagram, pieza por pieza. Funciona sin señal.',
           encargos: 'Piezas a pedido, con su abono y la fecha de entrega.',
           historial: 'Todas las ventas directas, día por día.',
           ferias: 'Cada feria con sus fechas, costos y resultado.',
-          analisis: 'Qué se vende, dónde, cómo se paga y a qué hora.',
-          ordenes: 'Pedidos de tiendas y cafeterías, con PDF para mandar por WhatsApp.',
-          consignacion: 'Piezas que dejaste en tiendas para que las vendan, y sus liquidaciones.',
-          'por-facturar': 'Órdenes entregadas sin factura, listas para el facturador del SII.'
+          analisis: 'Qué se vende, dónde, cómo se paga y a qué hora.'
         }[actual]}</p>
       </header>
       ${pestanas('ventas', PEST, actual)}
       <div id="ven-cuerpo"></div>`;
     const c = $('#ven-cuerpo', el);
-    if (actual === 'clientes') return vistaClientes(c);
+    if (actual === 'clientes') return vistaClientes(c, { tipo: 'persona' });
     if (actual === 'venta-rapida') return vistaVentaRapida(c);
     if (actual === 'historial') return vistaHistorial(c);
     if (actual === 'ferias') return vistaFerias(c);
     if (actual === 'analisis') return vistaAnalisis(c);
     if (actual === 'encargos') return vistaEncargos(c);
-    if (actual === 'ordenes') return vistaOrdenes(c);
-    if (actual === 'consignacion') return vistaConsignacion(c);
-    if (actual === 'por-facturar') return vistaPorFacturar(c);
     return null;
   }
 };
 
-function vistaClientes(el) {
-  const f = { texto: '', tipo: '', archivados: false };
+// Clientes de un tipo: 'persona' (Ventas) o 'empresa' (Empresas).
+export function vistaClientes(el, { tipo }) {
+  const f = { texto: '', tipo, archivados: false };
   el.innerHTML = `
     <div class="barra-herramientas">
       <input type="search" class="buscador" placeholder="Buscar por nombre o RUT" aria-label="Buscar cliente">
-      <select class="filtro" aria-label="Tipo"><option value="">Todos</option><option value="empresa">Empresas</option><option value="persona">Clientes finales</option></select>
       <label class="interruptor"><input type="checkbox" data-arch><span>Archivados</span></label>
       <span class="espacio"></span>
-      <button class="btn btn-primario" data-nuevo>${ICONOS.mas2}<span>Nuevo cliente</span></button>
+      <button class="btn btn-primario" data-nuevo>${ICONOS.mas2}<span>${tipo === 'empresa' ? 'Nueva empresa' : 'Nuevo cliente'}</span></button>
     </div>
     <div data-lista></div>`;
   $('.buscador', el).addEventListener('input', (e) => { f.texto = e.target.value; pintar(); });
-  $('.filtro', el).addEventListener('change', (e) => { f.tipo = e.target.value; pintar(); });
   $('[data-arch]', el).addEventListener('change', (e) => { f.archivados = e.target.checked; pintar(); });
-  $('[data-nuevo]', el).addEventListener('click', () => editarCliente());
+  $('[data-nuevo]', el).addEventListener('click', () => editarCliente(null, { tipoInicial: tipo }));
   const lista = $('[data-lista]', el);
   function pintar() {
-    const todos = Object.values(estado.clientes);
+    const todos = Object.values(estado.clientes).filter((c) => (tipo === 'empresa' ? c.tipo === 'empresa' : c.tipo !== 'empresa'));
     if (!todos.length) {
-      lista.innerHTML = vacio('Todavía no hay clientes', 'Crea las tiendas y cafeterías a las que facturas. También se crean solos al cargar en Cobranza los XML de las facturas emitidas.', '<button class="btn btn-primario" data-nuevo2>Crear el primer cliente</button>');
-      $('[data-nuevo2]', lista)?.addEventListener('click', () => editarCliente());
+      lista.innerHTML = tipo === 'empresa'
+        ? vacio('Todavía no hay empresas', 'Crea las tiendas, cafeterías y profesionales a los que facturas, con su RUT, giro y plazo de pago. También se crean solos al cargar en Cobranza los XML de las facturas emitidas.', '<button class="btn btn-primario" data-nuevo2>Crear la primera empresa</button>')
+        : vacio('Todavía no hay clientes', 'Las personas que te compran, te encargan o toman clases: con su nombre, WhatsApp e Instagram puedes escribirles y saber qué compran.', '<button class="btn btn-primario" data-nuevo2>Crear el primer cliente</button>');
+      $('[data-nuevo2]', lista)?.addEventListener('click', () => editarCliente(null, { tipoInicial: tipo }));
       return;
     }
     const q = norm(f.texto.trim());

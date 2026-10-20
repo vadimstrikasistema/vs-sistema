@@ -63,6 +63,14 @@ const COBALTO = [42, 61, 143];
 const TINTA = [43, 40, 37];
 const SUAVE = [110, 102, 94];
 
+// Estado de cuenta de deudas elegidas (facturas, ventas, clases, encargos, órdenes sin facturar).
+// items: [{ etiqueta, fecha, vencimiento, total, saldo, dias }]
+export function pdfEstadoCuentaItems(cliente, items) {
+  return pdfEstadoCuenta(cliente, items, {
+    diasAtraso: (x) => x.dias || 0, saldo: (x) => x.saldo, etiquetaFactura: (x) => x.etiqueta
+  });
+}
+
 export async function pdfEstadoCuenta(cliente, facturas, { diasAtraso, saldo, etiquetaFactura }) {
   const JsPDF = await cargarJsPDF();
   const doc = new JsPDF({ unit: 'mm', format: 'a4' });
@@ -102,7 +110,7 @@ export async function pdfEstadoCuenta(cliente, facturas, { diasAtraso, saldo, et
     const s = saldo(f);
     total += s;
     doc.setTextColor(...TINTA);
-    doc.text(etiquetaFactura(f), cols[0], y);
+    doc.text(doc.splitTextToSize(String(etiquetaFactura(f)), 44)[0], cols[0], y);
     doc.text(fechaCorta(f.fecha), cols[1], y);
     doc.text(fechaCorta(f.vencimiento), cols[2], y);
     if (d > 0) doc.setTextColor(140, 74, 82);

@@ -58,7 +58,7 @@ function favorito() {
   async function paso1() {
     var d = null;
     try { d = leerCodigo(await navigator.clipboard.readText()); } catch (e) { /* sin permiso */ }
-    if (!d) d = leerCodigo(prompt('Pega el código de la factura.\n(En el sistema: Ventas → Por facturar → «Copiar para el SII»)'));
+    if (!d) d = leerCodigo(prompt('Pega el código de la factura.\n(En el sistema: Empresas → Por facturar → «Copiar para el SII»)'));
     if (!d) { alert('Ese no es un código del sistema. Vuelve a copiarlo con «Copiar para el SII».'); return; }
     var rut = buscar('RUT_RECEP'), dv = buscar('DV_RECEP');
     if (!rut) {

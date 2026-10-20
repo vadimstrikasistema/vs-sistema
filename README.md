@@ -113,18 +113,20 @@ Estas decisiones se respetan en todas las fases:
 | `lotes` | uno por tanda de piezas | pieza, `cantidadInicial`, `cantidadActual`, `etapa` (modelado, seco, bizcochado, esmaltado, terminado), `estado`, `historial[]` de cada etapa con lo que entró, salió y se perdió (y por qué), costos acumulados (`costoPasta`, `costoEsmalte`, `costoOtros`, `costoHoras`, `costoQuemas`, `creditoReciclaje`), al terminar `primera`, `segunda`, `costoUnitario`, y los movimientos que generó |
 | `quemas` | una por quema | `tipo` (bizcocho o esmalte), fecha, cono, `energia` y `costo`, `puntos` y `ocupacion`, y por lote: piezas, puntos, costo asignado y lo que salió |
 | `movPiezas` | uno por entrada o salida de piezas terminadas | pieza, `calidad` (primera o segunda), `cantidad` con signo, costo, `tipo` (produccion, ajuste, venta, venta-b2b, consignacion, devolucion, anulacion), motivo, `ref`, `anulado` |
-| `clientes` | uno por cliente | `tipo` (empresa o persona), `rut`, `rutLimpio`, `razonSocial`, `nombre` (del local), `giro`, `direccion`, `comuna`, `contacto`, `whatsapp`, `correo`, `instagram`, `condicionDias` (plazo de pago), `ultimoRecordatorio`, `notas`, `archivado` |
+| `clientes` | uno por cliente | `tipo` (empresa o persona), `rut`, `rutLimpio`, `razonSocial`, `nombre` (del local), `giro`, `direccion`, `comuna`, `contacto`, `whatsapp`, `correo`, `instagram`, `condicionDias` (plazo de pago), `cobranza` (resumen: `ultimoMensaje`, `ultimaRespuesta`, `promesa`, `ultimaGestion`), `precios` recordados, `notas`, `archivado` |
 | `facturas` | una por documento emitido (cuenta por cobrar) | `origen` (xml o manual), `tipoDoc` (33, 34, 61, 0 sin documento), `folio`, `fecha`, `mes`, `vencimiento`, cliente, `neto`, `iva`, `total`, `lineas`, `referencias`, `pagado`, `estado` (pendiente, parcial, pagada, anulada, nota-credito), `abierta`, `aplicadaA` en notas de crédito; `ordenIds` y `ordenNumeros` si viene de órdenes de venta |
 | `pagos` | uno por pago recibido | cliente, `fecha`, `medio`, `referencia`, `monto`, `aplicaciones[]` (factura y monto), `tipo` (pago o nota-credito), `anulado` |
-| `ventas` | una por venta directa | `fecha`, `mes`, `hora`, `canal`, `feriaId`, `medio`, cliente, `lineas[]` (pieza o sin ficha, `calidad`, cantidad, precio con IVA, `costoUnitario`), `descuento`, `total`, `neto`, `iva`, `comision`, `costo`, `boleta` (`emitida`, `folio`), `movs` (salidas de piezas), `pagos[]` y `encargoId` si viene de un encargo, `cursoId` si es el pago de una clase, `anulado` |
+| `ventas` | una por venta directa | `fecha`, `mes`, `hora`, `canal`, `feriaId`, `medio`, cliente, `lineas[]` (pieza o sin ficha, `calidad`, cantidad, precio con IVA, `costoUnitario`), `descuento`, `total`, `neto`, `iva`, `comision`, `costo`, `boleta` (`emitida`, `folio`), `movs` (salidas de piezas), `pagos[]` y `encargoId` si viene de un encargo, `cursoId` si es el pago de una clase, `deuda` (`saldo`, `pagos`) y `deudaAbierta` si quedó debiendo, `anulado` |
 | `ferias` | una por feria | `nombre`, `lugar`, `fechaInicio`, `fechaFin`, `costoPuesto`, `otrosCostos`, `notas`, `cerrada` |
 | `config` | `ventas` | `controlarStock`, `comisiones` por medio de pago, `recordarBoleta` |
 | `ordenes` | una por orden de venta a empresas | `numero` (correlativo), `fecha`, `mes`, cliente (`clienteId`, `razonSocial`, `rutCliente`, `rutLimpio`), `condicionDias`, `origen` (directa o consignacion), `consignacionId` y `consignacionNumero`, `lineas[]` (pieza, `calidad`, cantidad, precio neto, `subtotal`, `costoUnitario`), `neto`, `iva`, `total`, `costo`, `entregada`, `fechaEntrega`, `fechaCompromiso`, `facturada`, `facturaId`, `folio`, `fechaFactura`, `nota`, `anulada` |
-| `consignaciones` | una por tienda con piezas en consignación | `numero`, `fecha`, cliente, `lineas[]` (`key`, pieza, `calidad`, precio neto, `costoUnitario`, `entregadas`, `vendidas`, `devueltas`, `perdidas`), `entregas[]`, `liquidaciones[]` (fecha, vendidas, vuelven, vuelven dañadas, perdidas y su costo, `ordenId`), `cerrada`, `nota`, `anulada` |
+| `consignaciones` | una por tienda con piezas en consignación | `numero`, `fecha`, cliente, `lineas[]` (`key`, pieza, `calidad`, precio neto, `costoUnitario`, `entregadas`, `vendidas`, `devueltas`, `perdidas`), `entregas[]`, `liquidaciones[]` (fecha, vendidas, vuelven, vuelven dañadas, perdidas y su costo, `ordenId`), `visitas[]`, `cerrada`, `nota`, `anulada` |
 | `encargos` | uno por encargo de un cliente | `numero`, `fecha`, `fechaEntrega`, `canal`, cliente, `lineas[]` (pieza o sin ficha, cantidad, precio con IVA), `total`, `nota`, `abonos[]` (`monto`, `medio`, `fecha`, `devuelto`), `estado` (pendiente, taller, listo, entregado, anulado), `historial[]`, `ventaId`, `fechaEntregado` |
 | `eventos` | uno por evento propio de la agenda | `titulo`, `tipo` (entrega, clase, quema, compra, reunion, otro), `lugar`, `fecha`, `fechaFin`, `hora`, `horaFin`, `nota`, `hecho`, `anulado` |
 | `recurrentes` | una por cuenta que se repite | `nombre`, `proveedor`, `rutProveedor`, `rutLimpio`, `tipoDoc`, `itemGasto`, `area`, `frecuencia` (meses: 1, 2, 3, 6, 12), `dia` de vencimiento, `inicio` (primer mes), `montoEstimado`, `medio`, `nota`, `registros` (por mes `YYYY-MM`: `gastoId`, `total`, `estado` pagado o por-pagar), `creadoMes`, `activo` |
 | `cursos` | uno por curso o taller | `numero`, `nombre`, `tipo` (ciclo o taller), `precio` por alumno, `cupos`, `lugar`, `descripcion`, `sesiones[]` (`key`, `fecha`, `hora`, `horaFin`, `tema`, `hecha`, `cancelada`, `asistencia`), `alumnos[]` (`key`, `clienteId`, `nombre`, `whatsapp`, `precio` especial, `pagos[]` con `ventaId`, `retirado`), `materiales[]` (insumo, cantidad, costo, movimiento), `otrosCostos`, `estado` (abierto o terminado), `anulado` |
+| `gestiones` | una por gestión de cobranza | `clienteId`, `clienteNombre`, `fecha`, `tipo` (mensaje, liquidacion, respuesta, promesa, llamada, visita, nota, pago), `tono` (amable, firme, ultimo), `texto`, `deudas[]` (tipo, id, etiqueta, saldo), `total`, `promesa` (`fecha`, `monto`), `anulado` |
+| `config` | `cobranza` | `diasEntreTonos`, `diasConsignacion`, `plantillas` (amable, firme, ultimo, consignacion) |
 | `alertasPrecio` | una por cambio de precio de 10 % o más | insumo, costo anterior y nuevo, variación, proveedor, documento, recetas afectadas, `visto` |
 
 Listas iniciales: tipos de insumo, unidades, categorías de pieza, canales de venta, medios de pago, áreas del negocio, ítems de gasto, motivos de merma y motivos de ajuste de inventario.
@@ -150,6 +152,7 @@ js/encargos-core.js     encargos con abono
 js/agenda-core.js       todo lo que tiene fecha, para la agenda
 js/recurrentes-core.js  cuentas que se repiten y el registro de cada mes
 js/clases-core.js       cursos, sesiones, alumnos, pagos y materiales
+js/cobranza-gestion-core.js  todo lo que te deben, escalera de tonos, plantillas y gestiones
 js/modulos/             una pantalla por módulo
 fonts/, img/            tipografías y logo (incluidos para funcionar sin señal)
 ```
@@ -171,9 +174,23 @@ fonts/, img/            tipografías y logo (incluidos para funcionar sin señal
    - **4a** · encargos con abono y agenda con eventos propios (clases, quemas, entregas), ferias, encargos, órdenes por entregar y vencimientos de cobro. ✔
    - **4b** · cuentas recurrentes (luz, arriendo, internet, contador) y gastos por pagar en la agenda. ✔
    - **4c** · clases y talleres, modo feria, tipos de evento editables con color. ✔
+5. **Ventas, Empresas y Cobranza** · Ventas (a personas) y Empresas separadas; Cobranza con todo lo que te deben, ficha por cliente, escalera de tres tonos, promesas y seguimiento de consignación. ✔
    - Por confirmar: contactos de feria con QR, conteo de piezas (enero), rol de ayudante, fotos de piezas.
 
 ## Historial de versiones
+
+### 1.1.0 · Ventas, Empresas y la nueva Cobranza
+- **Menú:** Ventas queda para las personas (venta rápida, encargos, ferias, historial, clientes finales, análisis) y **Empresas** reúne órdenes, consignación, por facturar, clientes empresa y un **análisis por tienda** (lo que compra, su margen, lo que tiene en consignación, cuánto vende de lo que dejas, última visita, lo que debe y lo que falta facturar). Los enlaces antiguos siguen funcionando. La barra del celular: Inicio, Ventas, Empresas, Cobranza y Más.
+- **Queda debiendo:** una venta a una persona se puede registrar sin cobrar (con su cliente); queda en Cobranza hasta que pague.
+- **Cobranza → Por cobrar:** todo lo que te deben, por cliente: facturas abiertas, órdenes entregadas sin factura, ventas que quedaron debiendo, saldos de clases y encargos listos para retirar. Con lo que toca hacer con cada uno.
+- **Escalera de tres tonos:** amable cuando vence, firme si pasan los días sin pago ni respuesta, último aviso con plazo, y después llamar o visitar. Una respuesta reinicia la espera; una promesa de pago la detiene hasta su fecha y, si no se cumple, lo avisa.
+- **Ficha de cobranza** por cliente: qué debe, desde cuándo y con cuánto atraso; lo que toca; escribir eligiendo las deudas, con el estado de cuenta de esas deudas en PDF; anotar respuesta, promesa, llamada o visita; registrar el pago; historial de gestiones y pagos.
+- **Registrar pago** reparte entre facturas, ventas, clases y encargos, de lo más antiguo a lo más nuevo.
+- **Cobranza → Consignación:** tiendas con piezas en consignación ordenadas por días sin visita; a los 30 días piden la liquidación por WhatsApp (con el PDF de lo que tienen); se anota una visita aunque no se venda nada.
+- **Agenda e Inicio:** promesas de pago, a quién toca escribir hoy y las consignaciones por revisar.
+- **Configuración → Cobranza:** días entre tonos, aviso de consignación y los textos de los cuatro mensajes.
+- **Reglas de Firestore nuevas** para gestiones, la configuración de cobranza y los pagos de ventas que quedaron debiendo. **Hay que volver a publicarlas.**
+- Estructura de datos versión 11.
 
 ### 1.0.0 · Entrega 4c: clases, modo feria y tipos de evento
 - **Clases** (menú nuevo): cursos de varias sesiones o talleres de un día, con precio por alumno, cupos y sesiones semanales que aparecen en la Agenda. Alumnos (clientes finales) con precio especial si hace falta; cada pago queda como venta del canal fijo «Clases», con medio de pago y boleta, y se anula junto con su venta. Sesiones con tema, asistencia y recordatorio por WhatsApp con el saldo. Materiales que salen de bodega a costo promedio, otros costos y el resultado del curso.

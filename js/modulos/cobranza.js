@@ -14,8 +14,13 @@ import { mesDe } from '../gastos-core.js';
 import { editarCliente } from './ventas.js';
 import { pdfEstadoCuenta, compartirPDF, enlaceWhatsApp, telefonoWhatsApp } from '../pdf.js';
 import { ICONOS } from '../iconos.js';
+import { vistaDeudores, fichaCliente, vistaSeguimientoConsignacion, cargarDeudas } from './cobranza-deudores.js';
+import { todasLasDeudas, diasAtrasoDeuda, registrarGestion } from '../cobranza-gestion-core.js';
+import { pagarVenta } from '../ventas-core.js';
+import { pagarAlumno } from '../clases-core.js';
+import { agregarAbono } from '../encargos-core.js';
 
-const PEST = [['por-cobrar', 'Por cobrar'], ['facturas', 'Facturas'], ['pagos', 'Pagos']];
+const PEST = [['por-cobrar', 'Por cobrar'], ['consignacion', 'Consignación'], ['facturas', 'Facturas'], ['pagos', 'Pagos']];
 const fallo = avisoError(toast);
 const TIPOS_MANUAL = [33, 34, 61, 0];
 const nombreMes = (m) => { const [y, mm] = m.split('-').map(Number); const t = new Date(y, mm - 1, 1).toLocaleDateString('es-CL', { month: 'long', year: 'numeric' }); return t.charAt(0).toUpperCase() + t.slice(1); };
@@ -25,188 +30,69 @@ const medioTexto = (m) => (m === 'nota-credito' ? 'Nota de crédito' : m ? nombr
 
 let abiertas = [];
 
+export { detalleFactura };
+
 export default {
   render(el, { sub }) {
+    if (sub === 'cliente') {
+      const id = location.hash.split('/')[3] || '';
+      return fichaCliente(el, decodeURIComponent(id), { pagoDialogo, abrirFactura: detalleFactura });
+    }
     const actual = PEST.some(([k]) => k === sub) ? sub : 'por-cobrar';
     el.innerHTML = `
       <header class="pagina-cabecera">
         <h1>Cobranza</h1>
-        <p class="pagina-bajada">${{ 'por-cobrar': 'Qué se debe, quién lo debe y desde cuándo.', facturas: 'Las facturas emitidas por el taller, cargadas desde el XML del SII o a mano.', pagos: 'Cada pago recibido y a qué facturas se aplicó.' }[actual]}</p>
+        <p class="pagina-bajada">${{ 'por-cobrar': 'Qué te deben, quién, cuánto y desde cuándo, y qué toca hacer para cobrarlo.', consignacion: 'Tiendas con piezas en consignación: cuánto tiempo llevan sin liquidar o sin visita.', facturas: 'Las facturas emitidas por el taller, cargadas desde el XML del SII o a mano.', pagos: 'Cada pago recibido y a qué facturas se aplicó.' }[actual]}</p>
       </header>
       ${pestanas('cobranza', PEST, actual)}
       <div id="cob-cuerpo"></div>`;
     const c = $('#cob-cuerpo', el);
-    return ({ 'por-cobrar': vistaPorCobrar, facturas: vistaFacturas, pagos: vistaPagos })[actual](c);
+    return ({ 'por-cobrar': (x) => vistaDeudores(x, { pagoDialogo }), consignacion: vistaSeguimientoConsignacion, facturas: vistaFacturas, pagos: vistaPagos })[actual](c);
   }
 };
 
-// ================================================================ Por cobrar
-function vistaPorCobrar(el) {
-  el.innerHTML = '<div class="resumen" data-resumen></div><div class="barra-herramientas"><span class="espacio"></span><button class="btn btn-suave" data-cargar>Cargar facturas emitidas</button><button class="btn btn-primario" data-pago>Registrar pago</button></div><div data-lista></div>';
-  $('[data-pago]', el).addEventListener('click', () => pagoDialogo());
-  $('[data-cargar]', el).addEventListener('click', () => { location.hash = '#/cobranza/facturas'; });
-  const pintar = () => {
-    const hoy = hoyISO();
-    const fs = abiertas.filter((f) => !f.anulada && saldo(f) > 0);
-    const venc = fs.filter((f) => diasAtraso(f, hoy) > 0);
-    const total = fs.reduce((s, f) => s + saldo(f), 0);
-    const tv = venc.reduce((s, f) => s + saldo(f), 0);
-    const porCliente = new Map();
-    fs.forEach((f) => { if (!porCliente.has(f.clienteId)) porCliente.set(f.clienteId, []); porCliente.get(f.clienteId).push(f); });
-    $('[data-resumen]', el).innerHTML = `
-      <div class="dato"><span class="dato-etq">Por cobrar</span><span class="dato-valor">${pesos(total)}</span></div>
-      <div class="dato ${tv ? 'dato-alerta' : ''}"><span class="dato-etq">Vencido</span><span class="dato-valor">${pesos(tv)}</span></div>
-      <div class="dato"><span class="dato-etq">Al día</span><span class="dato-valor">${pesos(total - tv)}</span></div>
-      <div class="dato"><span class="dato-etq">Clientes con saldo</span><span class="dato-valor">${porCliente.size}</span></div>`;
-    const lista = $('[data-lista]', el);
-    if (!fs.length) {
-      lista.innerHTML = vacio('No hay nada por cobrar', 'Carga los XML de las facturas que emitiste en el SII, o regístralas a mano en la pestaña Facturas. Aquí aparecerán por cliente, con sus días de atraso.', '<a class="btn btn-primario" href="#/cobranza/facturas">Ir a Facturas</a>');
-      return;
-    }
-    const grupos = [...porCliente.entries()].map(([id, lista2]) => ({
-      cliente: estado.clientes[id] || { id, nombre: lista2[0].clienteNombre },
-      facturas: lista2.sort((a, b) => (a.vencimiento || '').localeCompare(b.vencimiento || '')),
-      total: lista2.reduce((s, f) => s + saldo(f), 0),
-      maxAtraso: Math.max(...lista2.map((f) => diasAtraso(f, hoy)))
-    })).sort((a, b) => b.maxAtraso - a.maxAtraso || b.total - a.total);
-    lista.innerHTML = `<div class="deudores">${grupos.map((g) => `
-      <article class="panel deudor ${g.maxAtraso > 30 ? 'deudor-grave' : g.maxAtraso > 0 ? 'deudor-atrasado' : ''}" data-cliente="${esc(g.cliente.id)}">
-        <div class="deudor-cabeza">
-          <div><h2>${esc(nombreCliente(g.cliente))}</h2>
-            <p class="texto-suave">${g.facturas.length} documento${g.facturas.length > 1 ? 's' : ''}${g.maxAtraso > 0 ? ` · <span class="texto-alerta">el más antiguo con ${g.maxAtraso} días de atraso</span>` : ' · al día'}${g.cliente.ultimoRecordatorio ? ` · recordado el ${fechaCorta(g.cliente.ultimoRecordatorio.fecha)}` : ''}</p></div>
-          <span class="deudor-total">${pesos(g.total)}</span>
-        </div>
-        <ul class="folios">${g.facturas.map((f) => { const d = diasAtraso(f, hoy); return `
-          <li><button class="folio" data-factura="${esc(f.id)}"><span>${esc(etiquetaFactura(f))}</span><span class="texto-suave">${fechaCorta(f.fecha)}</span>
-            <span class="${d > 0 ? 'texto-alerta' : 'texto-suave'}">${textoAtraso(d)}</span><span class="folio-monto">${pesos(saldo(f))}${f.pagado > 0 ? ` <span class="texto-tenue">de ${pesos(f.total)}</span>` : ''}</span></button></li>`; }).join('')}</ul>
-        <div class="deudor-acciones">
-          <button class="btn btn-suave btn-chico" data-recordar>Recordar por WhatsApp</button>
-          <button class="btn btn-suave btn-chico" data-estado>Estado de cuenta</button>
-          <button class="btn btn-primario btn-chico" data-pagar>Registrar pago</button>
-        </div>
-      </article>`).join('')}</div>`;
-    $$('.deudor', lista).forEach((card) => {
-      const g = grupos.find((x) => x.cliente.id === card.dataset.cliente);
-      $('[data-pagar]', card).addEventListener('click', () => pagoDialogo(g.cliente.id));
-      $('[data-recordar]', card).addEventListener('click', () => recordatorio(g.cliente, g.facturas));
-      $('[data-estado]', card).addEventListener('click', () => estadoCuenta(g.cliente, g.facturas));
-      $$('[data-factura]', card).forEach((b) => b.addEventListener('click', () => detalleFactura(g.facturas.find((f) => f.id === b.dataset.factura))));
-    });
-  };
-  const des = [alCambiar(pintar), escucharDonde('facturas', 'abierta', '==', true, (l) => { abiertas = l; pintar(); })];
-  pintar();
-  return () => des.forEach((u) => u());
-}
-
-// ---------------------------------------------------------------- Recordatorio
-function textoRecordatorio(cliente, facturas, tono) {
-  const e = estado.empresa || {};
-  const quien = e.nombreFantasia || 'Vadim Strika';
-  const saludo = cliente.contacto ? cliente.contacto.split(' ')[0] : nombreCliente(cliente);
-  const hoy = hoyISO();
-  const total = facturas.reduce((s, f) => s + saldo(f), 0);
-  const linea = (f) => { const d = diasAtraso(f, hoy); return `• ${etiquetaFactura(f)} del ${fechaCorta(f.fecha)}: ${pesos(saldo(f))}${d > 0 ? ` (venció hace ${d} día${d > 1 ? 's' : ''})` : ` (vence el ${fechaCorta(f.vencimiento)})`}`; };
-  const una = facturas.length === 1;
-  const detalle = una ? `la ${etiquetaFactura(facturas[0]).toLowerCase()} del ${fechaCorta(facturas[0].fecha)} por ${pesos(total)}` : `estos documentos:\n${facturas.map(linea).join('\n')}\nTotal: ${pesos(total)}`;
-  const banco = e.datosTransferencia ? `\n\nDatos para transferir: ${e.datosTransferencia}` : '';
-  if (tono === 'firme') {
-    return `Hola ${saludo}. Te escribo de ${quien} porque tenemos pendiente ${una ? detalle : `el pago de ${detalle}`}.\n\nTe pido por favor regularizar el pago esta semana.${banco}\n\nQuedo atento a la confirmación. Gracias.`;
-  }
-  return `Hola ${saludo}, ¿cómo estás? Te escribo de ${quien} para recordarte ${una ? `que tenemos pendiente ${detalle}` : `que tenemos pendientes ${detalle}`}.${banco}\n\nSi ya lo pagaste, avísame y lo marco. ¡Muchas gracias!`;
-}
-
-async function recordatorio(cliente, facturas) {
-  const conAtraso = facturas.some((f) => diasAtraso(f) > 15);
-  const tel = telefonoWhatsApp(cliente.whatsapp);
-  await formulario({
-    titulo: `Recordar a ${nombreCliente(cliente)}`, ancho: true, textoGuardar: 'Abrir WhatsApp',
-    cuerpo: `
-      <div class="segmentado" role="radiogroup">
-        <label><input type="radio" name="tono" value="amable" ${!conAtraso ? 'checked' : ''}><span>Amable</span></label>
-        <label><input type="radio" name="tono" value="firme" ${conAtraso ? 'checked' : ''}><span>Firme</span></label>
-      </div>
-      <label class="campo"><span class="campo-etiqueta">Mensaje ${info('Puedes cambiar el texto antes de enviarlo. Los datos de transferencia salen de Configuración → Empresa.')}</span><textarea name="texto" rows="10"></textarea></label>
-      ${tel ? `<p class="texto-suave">Se abrirá el chat de WhatsApp con ${esc(cliente.whatsapp)}.</p>` : '<p class="aviso aviso-suave">Este cliente no tiene WhatsApp. Se abrirá WhatsApp para que elijas el chat, o agrega el número en Ventas → Clientes.</p>'}
-      <label class="interruptor"><input type="checkbox" name="conPdf"><span>Adjuntar el estado de cuenta en PDF</span></label>`,
-    montar(dlg, form) {
-      const v = () => { form.texto.value = textoRecordatorio(cliente, facturas, form.tono.value); };
-      $$('input[name=tono]', dlg).forEach((r) => r.addEventListener('change', v));
-      v();
-    },
-    async guardar(form) {
-      const texto = form.texto.value.trim();
-      if (!texto) return 'El mensaje está vacío.';
-      if (form.conPdf.checked) {
-        try {
-          const blob = await pdfEstadoCuenta(cliente, facturas, { diasAtraso, saldo, etiquetaFactura });
-          await compartirPDF(blob, `Estado de cuenta ${nombreCliente(cliente)}.pdf`, texto, cliente.whatsapp);
-        } catch (e) { console.error(e); return 'No se pudo generar el PDF. Revisa la conexión la primera vez que lo usas.'; }
-      } else {
-        window.open(enlaceWhatsApp(cliente.whatsapp, texto), '_blank', 'noopener');
-      }
-      if (cliente.id && estado.clientes[cliente.id]) {
-        enviar(nuevoLote().update(refDoc('clientes', cliente.id), { ultimoRecordatorio: { fecha: hoyISO(), tono: form.tono.value }, ...firma() }).commit(), { alFallar: fallo });
-      }
-      return null;
-    }
-  });
-}
-
-async function estadoCuenta(cliente, facturas) {
-  toast('Preparando el estado de cuenta…');
-  try {
-    const blob = await pdfEstadoCuenta(cliente, facturas, { diasAtraso, saldo, etiquetaFactura });
-    const total = facturas.reduce((s, f) => s + saldo(f), 0);
-    const r = await compartirPDF(blob, `Estado de cuenta ${nombreCliente(cliente)}.pdf`, `Hola, te envío el estado de cuenta de ${estado.empresa?.nombreFantasia || 'Vadim Strika'}: total pendiente ${pesos(total)}.`, cliente.whatsapp);
-    if (r === 'descargado') toast('Estado de cuenta descargado. Adjúntalo en el chat que se abrió.');
-  } catch (e) {
-    console.error(e);
-    toast('No se pudo generar el PDF. Revisa la conexión la primera vez que lo usas.', 'error');
-  }
-}
-
-// ---------------------------------------------------------------- Pago
-async function pagoDialogo(clienteId = '') {
-  let fs = abiertas.length ? abiertas : await documentosDonde('facturas', 'abierta', '==', true).catch(() => []);
-  fs = fs.filter((f) => !f.anulada && saldo(f) > 0);
-  const ids = [...new Set(fs.map((f) => f.clienteId))];
-  if (!ids.length) { toast('No hay facturas pendientes de pago.', 'aviso'); return; }
-  const cli = (id) => estado.clientes[id] || { id, nombre: fs.find((f) => f.clienteId === id)?.clienteNombre };
+// Pago de un cliente: se reparte entre lo que debe (facturas, ventas que quedaron
+// debiendo, saldos de clases y de encargos listos), de lo más antiguo a lo más nuevo.
+export async function pagoDialogo(clienteId = '') {
+  const fuentes = await cargarDeudas();
+  const ds = todasLasDeudas(fuentes).filter((d) => d.cobrable);
+  const ids = [...new Set(ds.map((d) => d.clienteId))];
+  if (!ids.length) { toast('No hay nada pendiente de pago.', 'aviso'); return; }
+  const cli = (id) => estado.clientes[id] || { id, nombre: ds.find((d) => d.clienteId === id)?.clienteNombre };
   await formulario({
     titulo: 'Registrar pago', ancho: true, textoGuardar: 'Registrar pago',
     cuerpo: `
       <div class="campos">
         <label class="campo campo-ancho"><span class="campo-etiqueta">Cliente</span>
           <select name="cliente">${ids.map((id) => `<option value="${esc(id)}" ${id === clienteId ? 'selected' : ''}>${esc(nombreCliente(cli(id)))}</option>`).join('')}</select></label>
-        ${campoNumero('monto', 'Monto recibido', '', { sufijo: '$', requerido: true, ayuda: info('Escribe lo que pagó y la app lo reparte entre sus facturas, de la más antigua a la más nueva. Puedes cambiar cuánto va a cada una. Un pago puede cubrir varias facturas o solo parte de una.') })}
+        ${campoNumero('monto', 'Monto recibido', '', { sufijo: '$', requerido: true, ayuda: info('Escribe lo que pagó y la app lo reparte entre lo que debe, de lo más antiguo a lo más nuevo. Puedes cambiar cuánto va a cada cosa. Un pago puede cubrir varias deudas o solo parte de una.') })}
         <label class="campo"><span class="campo-etiqueta">Fecha</span><input type="date" name="fecha" value="${hoyISO()}" max="${hoyISO()}"></label>
         <label class="campo"><span class="campo-etiqueta">Medio de pago</span><select name="medio">${opcionesLista('mediosPago', 'transferencia')}</select></label>
         <label class="campo"><span class="campo-etiqueta">Referencia</span><input name="referencia" maxlength="60" placeholder="N° de operación, opcional"></label>
       </div>
-      <div class="tabla-scroll"><table class="tabla tabla-entrada"><thead><tr><th>Documento</th><th class="num">Saldo</th><th class="num">Se aplica</th></tr></thead><tbody data-filas></tbody>
+      <div class="tabla-scroll"><table class="tabla tabla-entrada"><thead><tr><th>Deuda</th><th class="num">Saldo</th><th class="num">Se aplica</th></tr></thead><tbody data-filas></tbody>
         <tfoot><tr><th>Total aplicado</th><th></th><th class="num" data-aplicado>$0</th></tr></tfoot></table></div>
       <p class="texto-suave" data-dif></p>`,
     montar(dlg, form) {
+      const mias = () => ds.filter((d) => d.clienteId === form.cliente.value).sort((a, b) => (a.vencimiento || '').localeCompare(b.vencimiento || ''));
       const pintar = () => {
-        const mias = fs.filter((f) => f.clienteId === form.cliente.value).sort((a, b) => (a.vencimiento || '').localeCompare(b.vencimiento || ''));
-        $('[data-filas]', dlg).innerHTML = mias.map((f) => `<tr data-id="${esc(f.id)}"><td><span class="celda-nombre">${esc(etiquetaFactura(f))}</span><span class="celda-sub">${fechaCorta(f.fecha)} · ${textoAtraso(diasAtraso(f))}</span></td>
-          <td class="num">${pesos(saldo(f))}</td><td class="num"><span class="con-sufijo"><input data-m inputmode="numeric" value="" aria-label="Monto aplicado"><span class="sufijo">$</span></span></td></tr>`).join('');
-        if (!form.monto.value) form.monto.value = numero(mias.reduce((s, f) => s + saldo(f), 0), 0);
+        $('[data-filas]', dlg).innerHTML = mias().map((d) => `<tr data-id="${esc(d.id)}"><td><span class="celda-nombre">${esc(d.etiqueta)}</span><span class="celda-sub">${fechaCorta(d.fecha)} · ${textoAtraso(diasAtrasoDeuda(d) || (d.vencimiento && d.vencimiento > hoyISO() ? -Math.round((new Date(`${d.vencimiento}T12:00`) - new Date(`${hoyISO()}T12:00`)) / 86400000) : 0))}</span></td>
+          <td class="num">${pesos(d.saldo)}</td><td class="num"><span class="con-sufijo"><input data-m inputmode="numeric" value="" aria-label="Monto aplicado"><span class="sufijo">$</span></span></td></tr>`).join('');
+        if (!form.monto.value) form.monto.value = numero(mias().reduce((s, d) => s + d.saldo, 0), 0);
         distribuir();
       };
       const distribuir = () => {
-        const mias = fs.filter((f) => f.clienteId === form.cliente.value);
-        const rep = repartir(leerNumero(form.monto.value) || 0, mias);
-        rep.forEach(({ factura, monto }) => { const i = $(`tr[data-id="${factura.id}"] [data-m]`, dlg); if (i) i.value = monto ? numero(monto, 0) : ''; });
+        let resto = leerNumero(form.monto.value) || 0;
+        mias().forEach((d) => { const m = Math.max(0, Math.min(resto, d.saldo)); resto -= m; const i = $(`tr[data-id="${CSS.escape(d.id)}"] [data-m]`, dlg); if (i) i.value = m ? numero(m, 0) : ''; });
         sumar();
       };
       const sumar = () => {
         const ap = $$('[data-m]', dlg).reduce((s, i) => s + (leerNumero(i.value) || 0), 0);
         $('[data-aplicado]', dlg).textContent = pesos(ap);
         const m = leerNumero(form.monto.value) || 0;
-        const total = fs.filter((f) => f.clienteId === form.cliente.value).reduce((s, f) => s + saldo(f), 0);
-        $('[data-dif]', dlg).innerHTML = m > total ? `<span class="texto-alerta">El monto supera lo que debe (${pesos(total)}). Revisa el monto o registra la diferencia como una nueva factura.</span>`
-          : Math.round(ap) !== Math.round(m) ? `<span class="texto-alerta">Lo aplicado no suma el monto recibido.</span>` : '';
+        const total = mias().reduce((s, d) => s + d.saldo, 0);
+        $('[data-dif]', dlg).innerHTML = m > total ? `<span class="texto-alerta">El monto supera lo que debe (${pesos(total)}). Revisa el monto.</span>`
+          : Math.round(ap) !== Math.round(m) ? '<span class="texto-alerta">Lo aplicado no suma el monto recibido.</span>' : '';
       };
       form.cliente.addEventListener('change', () => { form.monto.value = ''; pintar(); });
       form.monto.addEventListener('input', distribuir);
@@ -216,21 +102,30 @@ async function pagoDialogo(clienteId = '') {
     guardar(form, dlg) {
       const m = leerNumero(form.monto.value);
       if (!(m > 0)) return 'Escribe el monto recibido.';
-      const aplicaciones = [];
+      const aplicadas = [];
       for (const tr of $$('[data-filas] tr', dlg)) {
-        const f = fs.find((x) => x.id === tr.dataset.id);
+        const d = ds.find((x) => x.id === tr.dataset.id);
         const v = leerNumero($('[data-m]', tr).value) || 0;
-        if (v < 0 || v > saldo(f) + 0.5) return `A ${etiquetaFactura(f)} no se le puede aplicar más que su saldo (${pesos(saldo(f))}).`;
-        if (v > 0) aplicaciones.push({ factura: f, monto: v });
+        if (v < 0 || v > d.saldo + 0.5) return `A ${d.etiqueta} no se le puede aplicar más que su saldo (${pesos(d.saldo)}).`;
+        if (v > 0) aplicadas.push({ d, monto: Math.round(v) });
       }
-      const ap = aplicaciones.reduce((s, a) => s + a.monto, 0);
-      if (!aplicaciones.length) return 'Aplica el pago a al menos una factura.';
+      const ap = aplicadas.reduce((s, a) => s + a.monto, 0);
+      if (!aplicadas.length) return 'Aplica el pago a al menos una deuda.';
       if (Math.round(ap) !== Math.round(m)) return `Lo aplicado (${pesos(ap)}) no suma el monto recibido (${pesos(m)}).`;
       const cliente = cli(form.cliente.value);
+      const fecha = form.fecha.value || hoyISO();
+      const medio = form.medio.value;
       const lote = nuevoLote();
-      registrarPago(lote, { cliente, fecha: form.fecha.value || hoyISO(), medio: form.medio.value, referencia: form.referencia.value.trim(), aplicaciones });
-      const quedan = aplicaciones.filter((a) => saldo(a.factura) > 0).length;
-      enviar(lote.commit(), { alGuardar: avisoGuardado(toast, `Pago de ${pesos(m)} registrado${quedan ? `. Queda saldo en ${quedan} documento${quedan > 1 ? 's' : ''}` : ''}`), alFallar: fallo });
+      const facturas = aplicadas.filter((a) => a.d.tipo === 'factura').map((a) => ({ factura: a.d.ref, monto: a.monto }));
+      if (facturas.length) registrarPago(lote, { cliente, fecha, medio, referencia: form.referencia.value.trim(), aplicaciones: facturas });
+      aplicadas.filter((a) => a.d.tipo !== 'factura').forEach(({ d, monto }) => {
+        if (d.tipo === 'venta') pagarVenta(lote, d.ref, { monto, medio, fecha });
+        if (d.tipo === 'clase') { const c = estado.cursos[d.cursoId]; pagarAlumno(lote, c, c.alumnos.find((a) => a.key === d.alumnoKey), { monto, medio, fecha, boleta: { emitida: false, folio: '' } }); }
+        if (d.tipo === 'encargo') agregarAbono(lote, estado.encargos[d.id], { monto, medio, fecha });
+      });
+      if (estado.clientes[cliente.id]) registrarGestion(lote, cliente, { tipo: 'pago', fecha, texto: `${pesos(m)} · ${nombreItem('mediosPago', medio)}`, items: aplicadas.map((a) => ({ ...a.d, saldo: a.monto })) });
+      const quedan = aplicadas.filter((a) => a.monto < a.d.saldo).length;
+      enviar(lote.commit(), { alGuardar: avisoGuardado(toast, `Pago de ${pesos(m)} registrado${quedan ? `. Queda saldo en ${quedan} deuda${quedan > 1 ? 's' : ''}` : ''}`), alFallar: fallo });
       return null;
     }
   });
@@ -303,7 +198,7 @@ async function cargar(archivos) {
   const lista = (t, xs) => (xs.length ? `<p><strong>${t}</strong></p><ul class="lista-puntos">${xs.slice(0, 20).map((x) => `<li>${esc(x)}</li>`).join('')}${xs.length > 20 ? `<li>y ${xs.length - 20} más</li>` : ''}</ul>` : '');
   await dialogo({
     titulo: r.nuevas.length ? `${r.nuevas.length} documento${r.nuevas.length > 1 ? 's' : ''} cargado${r.nuevas.length > 1 ? 's' : ''}` : 'No se cargaron documentos nuevos',
-    cuerpo: `${r.clientesNuevos ? `<p>Se crearon ${r.clientesNuevos} cliente${r.clientesNuevos > 1 ? 's' : ''} nuevo${r.clientesNuevos > 1 ? 's' : ''} con los datos de la factura. Agrégales su WhatsApp en Ventas → Clientes para enviarles recordatorios.</p>` : ''}
+    cuerpo: `${r.clientesNuevos ? `<p>Se crearon ${r.clientesNuevos} cliente${r.clientesNuevos > 1 ? 's' : ''} nuevo${r.clientesNuevos > 1 ? 's' : ''} con los datos de la factura. Agrégales su WhatsApp en su ficha de cliente para enviarles recordatorios.</p>` : ''}
       ${r.notas ? `<p>${r.notas} nota${r.notas > 1 ? 's' : ''} de crédito se descontaron de la factura que corrigen.</p>` : ''}
       ${lista('Ya estaban cargadas:', r.repetidas)}${lista('No se cargaron:', r.ajenas)}${lista('Atención:', r.errores)}`,
     botones: [{ texto: 'Entendido', valor: true }]
@@ -311,6 +206,7 @@ async function cargar(archivos) {
 }
 
 async function facturaManual() {
+  abiertas = await documentosDonde('facturas', 'abierta', '==', true).catch(() => []);
   const clientes = () => Object.values(estado.clientes).filter((c) => !c.archivado).sort((a, b) => nombreCliente(a).localeCompare(nombreCliente(b), 'es'));
   const opciones = (sel = '') => `<option value="">Elige un cliente</option>${clientes().map((c) => `<option value="${esc(c.id)}" ${c.id === sel ? 'selected' : ''}>${esc(nombreCliente(c))}</option>`).join('')}`;
   await formulario({

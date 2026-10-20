@@ -27,7 +27,7 @@ service cloud.firestore {
     match /config/{docId} {
       allow read: if permitido();
       allow create, update: if permitido() && firmado()
-        && docId in ['sistema', 'empresa', 'costeo', 'horno', 'ventas'];
+        && docId in ['sistema', 'empresa', 'costeo', 'horno', 'ventas', 'cobranza'];
       allow delete: if false;
     }
 
@@ -188,7 +188,7 @@ service cloud.firestore {
       allow update: if permitido() && firmado()
         && resource.data.anulado == false
         && request.resource.data.diff(resource.data).affectedKeys()
-             .hasOnly(['boleta', 'clienteId', 'clienteNombre', 'anulado', 'motivoAnulacion', 'anuladoEn', 'actualizado', 'actualizadoPor']);
+             .hasOnly(['boleta', 'clienteId', 'clienteNombre', 'anulado', 'motivoAnulacion', 'anuladoEn', 'deuda', 'deudaAbierta', 'pagos', 'medio', 'comision', 'actualizado', 'actualizadoPor']);
       allow delete: if false;
     }
 
@@ -262,13 +262,25 @@ service cloud.firestore {
       allow delete: if false;
     }
 
+    // Gestiones de cobranza (mensajes, respuestas, promesas, visitas): se crean y solo se pueden anular.
+    match /gestiones/{id} {
+      allow read: if permitido();
+      allow create: if permitido() && firmado()
+        && request.resource.data.clienteId is string
+        && request.resource.data.tipo is string
+        && request.resource.data.anulado == false;
+      allow update: if permitido() && firmado()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['anulado', 'anuladoEn', 'actualizado', 'actualizadoPor']);
+      allow delete: if false;
+    }
+
     // Colecciones de las fases siguientes (insumos, piezas, ventas, gastos…).
     // Se leen y escriben solo con permiso; nunca se borran.
     // (Excluye las colecciones de arriba para no saltarse sus reglas:
     // en Firestore basta que una regla permita para que se permita.)
     match /{coleccion}/{docId} {
       allow read: if permitido();
-      allow create, update: if permitido() && !(coleccion in ['config', 'listas', 'insumos', 'recetas', 'movimientos', 'preparaciones', 'conteos', 'gastos', 'proveedores', 'alertasPrecio', 'piezas', 'lotes', 'quemas', 'movPiezas', 'clientes', 'facturas', 'pagos', 'ventas', 'ferias', 'ordenes', 'consignaciones', 'encargos', 'eventos', 'recurrentes', 'cursos']);
+      allow create, update: if permitido() && !(coleccion in ['config', 'listas', 'insumos', 'recetas', 'movimientos', 'preparaciones', 'conteos', 'gastos', 'proveedores', 'alertasPrecio', 'piezas', 'lotes', 'quemas', 'movPiezas', 'clientes', 'facturas', 'pagos', 'ventas', 'ferias', 'ordenes', 'consignaciones', 'encargos', 'eventos', 'recurrentes', 'cursos', 'gestiones']);
       allow delete: if false;
     }
   }

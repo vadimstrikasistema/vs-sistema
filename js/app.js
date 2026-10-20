@@ -12,13 +12,14 @@ const MODULOS = [
   { clave: 'agenda', titulo: 'Agenda', carga: () => import('./modulos/agenda.js') },
   { clave: 'clases', titulo: 'Clases', carga: () => import('./modulos/clases.js') },
   { clave: 'ventas', titulo: 'Ventas', carga: () => import('./modulos/ventas.js') },
+  { clave: 'empresas', titulo: 'Empresas', carga: () => import('./modulos/empresas.js') },
   { clave: 'cobranza', titulo: 'Cobranza', carga: () => import('./modulos/cobranza.js') },
   { clave: 'produccion', titulo: 'Producción', carga: () => import('./modulos/produccion.js') },
   { clave: 'inventario', titulo: 'Inventario', carga: () => import('./modulos/inventario.js') },
   { clave: 'gastos', titulo: 'Gastos', carga: () => import('./modulos/gastos.js') },
   { clave: 'configuracion', titulo: 'Configuración', carga: () => import('./modulos/configuracion.js') }
 ];
-const EN_BARRA_MOVIL = ['inicio', 'ventas', 'cobranza', 'produccion'];
+const EN_BARRA_MOVIL = ['inicio', 'ventas', 'empresas', 'cobranza'];
 const MODO_FERIA = { clave: 'feria', titulo: 'Modo feria', carga: () => import('./modulos/modo-feria.js') };
 
 // ---------------------------------------------------------------- Login

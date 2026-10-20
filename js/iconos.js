@@ -5,6 +5,7 @@ export const ICONOS = {
   inicio: svg('<path d="M4 11.5 12 5l8 6.5"/><path d="M6.5 10v9h11v-9"/><path d="M10 19v-5h4v5"/>'),
   agenda: svg('<rect x="4" y="5.5" width="16" height="14" rx="2"/><path d="M4 10h16M8.5 3.5v4M15.5 3.5v4"/><circle cx="12" cy="14.5" r="1.2"/>'),
   clases: svg('<path d="M3.5 9 12 5l8.5 4L12 13z"/><path d="M7 11v4.5c1.5 1.3 3.2 2 5 2s3.5-.7 5-2V11"/><path d="M20.5 9v5"/>'),
+  empresas: svg('<path d="M4 9.5 5.5 5h13L20 9.5"/><path d="M4 9.5a2.7 2.7 0 0 0 5.3 0 2.7 2.7 0 0 0 5.4 0 2.7 2.7 0 0 0 5.3 0"/><path d="M5.5 11.5V19h13v-7.5"/><path d="M10 19v-4h4v4"/>'),
   ventas: svg('<path d="M5 8h14l-1.3 10.2a2 2 0 0 1-2 1.8H8.3a2 2 0 0 1-2-1.8z"/><path d="M9 8V6.5a3 3 0 0 1 6 0V8"/>'),
   cobranza: svg('<rect x="3.5" y="6.5" width="17" height="11" rx="2"/><circle cx="12" cy="12" r="2.4"/><path d="M7 9.5v5M17 9.5v5"/>'),
   produccion: svg('<path d="M8 4.5h8"/><path d="M9 4.5c0 3-3 4.5-3 9a6 6 0 0 0 12 0c0-4.5-3-6-3-9"/><path d="M7 13.5c2 1 8 1 10 0"/>'),

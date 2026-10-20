@@ -328,3 +328,11 @@ export async function registrarFactura(lote, { ordenes, cliente, folio, fecha })
   ordenes.forEach((o) => lote.update(refDoc('ordenes', o.id), { facturada: true, facturaId, folio: String(folio), fechaFactura: fecha, ...firma() }));
   return { facturaId, vinculada: Boolean(existente), diferencia: existente ? Math.round(existente.total - d.total) : 0 };
 }
+
+// Visita a una tienda con piezas en consignación (aunque no se liquide nada).
+export function anotarVisita(lote, c, { fecha, nota = '' }) {
+  lote.update(refDoc('consignaciones', c.id), { visitas: [...(c.visitas || []), { fecha, nota }], ...firma() });
+}
+
+// Último contacto con la tienda: entrega, liquidación o visita.
+export const ultimaVisita = (c) => [c.fecha, ...(c.entregas || []).map((e) => e.fecha), ...(c.liquidaciones || []).map((l) => l.fecha), ...(c.visitas || []).map((v) => v.fecha)].filter(Boolean).sort().pop();

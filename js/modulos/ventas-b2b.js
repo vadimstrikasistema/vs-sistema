@@ -1,14 +1,14 @@
-// Ventas → Órdenes, Consignación y Por facturar (ventas a tiendas y empresas).
+// Empresas → Órdenes, Consignación, Por facturar y Análisis (ventas a tiendas y profesionales).
 import { estado, alCambiar, enviar } from '../datos.js';
 import { esc, info, toast, $, $$, formulario, confirmar, leerNumero, numero, pesos, hoyISO, fechaCorta } from '../ui.js';
-import { nuevoLote } from '../stock.js';
+import { nuevoLote, escucharDonde } from '../stock.js';
 import { vacio, avisoError, avisoGuardado } from '../comunes.js';
 import { nombreCliente } from '../cobranza-core.js';
 import { mesDe } from '../gastos-core.js';
 import {
   precioCliente, totalesLineas, faltaStock, crearOrden, entregarOrden, anularOrden, etiquetaOV, etiquetaConsignacion,
   crearConsignacion, agregarAConsignacion, liquidarConsignacion, anularConsignacion, enTienda, piezasEnTienda, valorEnTienda,
-  porFacturar, detalleFactura, datosParaSII, codigoParaSII, registrarFactura
+  porFacturar, detalleFactura, datosParaSII, codigoParaSII, registrarFactura, ultimaVisita
 } from '../b2b-core.js';
 import { pdfOrden, pdfConsignacion, compartirPDF } from '../pdf.js';
 import { enlaceFavorito, URL_FACTURADOR_SII, copiar } from '../favorito-sii.js';
@@ -86,7 +86,7 @@ export function validarLineas(ls) {
 }
 
 const selectorCliente = (actual) => `
-  <label class="campo"><span class="campo-etiqueta">Cliente <span class="req">*</span> ${info('Tiendas, cafeterías y profesionales. Se crean en Ventas → Clientes, o aquí con «Nuevo». También se crean solos al cargar en Cobranza los XML de facturas emitidas.')}</span>
+  <label class="campo"><span class="campo-etiqueta">Cliente <span class="req">*</span> ${info('Tiendas, cafeterías y profesionales. Se crean en Empresas → Clientes, o aquí con «Nuevo». También se crean solos al cargar en Cobranza los XML de facturas emitidas.')}</span>
     <span class="con-boton"><select name="cliente"><option value="">Elige el cliente…</option>${empresas().map((c) => `<option value="${esc(c.id)}" ${c.id === actual ? 'selected' : ''}>${esc(nombreCliente(c))}</option>`).join('')}</select>
     <button type="button" class="btn btn-suave btn-chico" data-nuevo-cliente>Nuevo</button></span></label>`;
 
@@ -215,7 +215,7 @@ export async function detalleOrden(o0, { recienCreada = false } = {}) {
     titulo: `${etiquetaOV(o)} · ${o.clienteNombre}`, ancho: true, textoGuardar: '',
     extra: `<button type="button" class="btn btn-primario" data-enviar>PDF por WhatsApp</button>
       ${!o.anulada && !o.entregada ? '<button type="button" class="btn btn-suave" data-entregar>Marcar entregada</button>' : ''}
-      ${!o.anulada && o.entregada && !o.facturada ? '<a class="btn btn-suave" href="#/ventas/por-facturar" data-ir>Facturar</a>' : ''}
+      ${!o.anulada && o.entregada && !o.facturada ? '<a class="btn btn-suave" href="#/empresas/por-facturar" data-ir>Facturar</a>' : ''}
       ${!o.anulada && !o.facturada ? '<button type="button" class="btn btn-peligro" data-anular>Anular</button>' : ''}`,
     cuerpo: `
       ${recienCreada ? `<p class="aviso aviso-ok">Orden creada.${o.entregada ? ' Las piezas ya salieron del stock y la orden quedó en «Por facturar».' : ' Cuando entregues las piezas, márcala como entregada.'}</p>` : ''}
@@ -367,18 +367,18 @@ async function dialogoConsignacion(existente = null) {
   if (creada) setTimeout(() => detalleConsignacion(estado.consignaciones[creada.id] || creada), 50);
 }
 
-async function comprobante(c) {
+export async function comprobante(c, textoMensaje = null) {
   const cliente = clienteDe(c);
   toast('Preparando el PDF…');
   try {
     const blob = await pdfConsignacion(c, cliente, { enTienda });
-    const texto = `Hola, te envío el detalle de las piezas de ${estado.empresa?.nombreFantasia || 'Vadim Strika'} en consignación: ${plural(piezasEnTienda(c), 'pieza')}.`;
+    const texto = textoMensaje || `Hola, te envío el detalle de las piezas de ${estado.empresa?.nombreFantasia || 'Vadim Strika'} en consignación: ${plural(piezasEnTienda(c), 'pieza')}.`;
     const r = await compartirPDF(blob, `Consignacion ${c.numero} ${nombreCliente(cliente)}.pdf`, texto, cliente.whatsapp);
     if (r === 'descargado') toast('PDF descargado. Adjúntalo en el chat de WhatsApp que se abrió.');
   } catch (e) { console.error(e); toast('No se pudo generar el PDF. Revisa la conexión la primera vez que lo usas.', 'error'); }
 }
 
-async function detalleConsignacion(c0) {
+export async function detalleConsignacion(c0) {
   const c = estado.consignaciones[c0.id] || c0;
   const vendidas = c.lineas.reduce((s, l) => s + (l.vendidas || 0), 0);
   const hist = [
@@ -422,7 +422,7 @@ async function detalleConsignacion(c0) {
   });
 }
 
-async function liquidar(c0) {
+export async function liquidar(c0) {
   const c = estado.consignaciones[c0.id] || c0;
   const ls = c.lineas.filter((l) => enTienda(l) > 0);
   let res = null;
@@ -512,7 +512,7 @@ export function vistaPorFacturar(el) {
       <div class="dato"><span class="dato-etq">Órdenes · clientes</span><span class="dato-valor">${os.length} · ${porCliente.size}</span></div>
       <div class="dato"><span class="dato-etq">Por entregar ${info('Órdenes que todavía no se entregan. Se facturan después de entregarlas.')}</span><span class="dato-valor">${sinEntregar}</span></div>`;
     if (!os.length) {
-      lista.innerHTML = vacio('Nada por facturar', 'Aquí aparecen las órdenes de venta entregadas que todavía no tienen factura, juntas por cliente. Puedes facturar varias órdenes de un cliente en una sola factura.', '<a class="btn btn-suave" href="#/ventas/ordenes">Ver órdenes</a>');
+      lista.innerHTML = vacio('Nada por facturar', 'Aquí aparecen las órdenes de venta entregadas que todavía no tienen factura, juntas por cliente. Puedes facturar varias órdenes de un cliente en una sola factura.', '<a class="btn btn-suave" href="#/empresas/ordenes">Ver órdenes</a>');
       return;
     }
     const grupos = [...porCliente.entries()].map(([id, l]) => ({ cliente: clienteDe(l[0]), ordenes: l.sort((a, b) => a.numero - b.numero) }))
@@ -557,7 +557,7 @@ export function vistaPorFacturar(el) {
 }
 
 async function prepararFactura(ordenes, cliente) {
-  if (!cliente.rut) { toast('El cliente no tiene RUT. Complétalo en Ventas → Clientes.', 'error'); return; }
+  if (!cliente.rut) { toast('El cliente no tiene RUT. Complétalo en Empresas → Clientes.', 'error'); return; }
   const datos = datosParaSII(ordenes, cliente);
   const fila = (etq, valor, copiable = true) => `<li><span class="texto-suave">${etq}</span><span class="b2b-copiar"><span>${esc(valor || '—')}</span>${copiable && valor ? `<button type="button" class="btn-enlace" data-copia="${esc(valor)}">Copiar</button>` : ''}</span></li>`;
   await formulario({
@@ -608,4 +608,82 @@ async function prepararFactura(ordenes, cliente) {
       return null;
     }
   });
+}
+
+// ================================================================ Análisis por tienda
+const PERIODOS = [['12m', 'Últimos 12 meses'], ['anio', 'Este año'], ['mes', 'Este mes'], ['mes-ant', 'Mes anterior']];
+function rangoPeriodo(k, hoy = hoyISO()) {
+  const [y, m] = hoy.split('-').map(Number);
+  const ym = (yy, mm) => `${yy}-${String(mm).padStart(2, '0')}`;
+  if (k === 'anio') return [`${y}-01-01`, hoy];
+  if (k === 'mes') return [`${ym(y, m)}-01`, hoy];
+  if (k === 'mes-ant') { const d = new Date(y, m - 2, 1); const fin = new Date(y, m - 1, 0); return [`${ym(d.getFullYear(), d.getMonth() + 1)}-01`, `${ym(fin.getFullYear(), fin.getMonth() + 1)}-${String(fin.getDate()).padStart(2, '0')}`]; }
+  const d = new Date(y - 1, m - 1, Number(hoy.slice(8)) + 1);
+  return [`${ym(d.getFullYear(), d.getMonth() + 1)}-${String(d.getDate()).padStart(2, '0')}`, hoy];
+}
+const diasDesde = (iso) => (iso ? Math.round((new Date(`${hoyISO()}T12:00`) - new Date(`${iso}T12:00`)) / 86400000) : null);
+export { ultimaVisita };
+
+export function vistaAnalisisEmpresas(el) {
+  let periodo = '12m';
+  let facturas = [];
+  el.innerHTML = `
+    <div class="barra-herramientas"><select class="filtro" aria-label="Período">${PERIODOS.map(([k, t]) => `<option value="${k}">${t}</option>`).join('')}</select></div>
+    <div class="resumen" data-resumen></div>
+    <div data-cuerpo></div>`;
+  $('.filtro', el).addEventListener('change', (e) => { periodo = e.target.value; pintar(); });
+  function pintar() {
+    const [desde, hasta] = rangoPeriodo(periodo);
+    const ovs = Object.values(estado.ordenes).filter((o) => !o.anulada && o.fecha >= desde && o.fecha <= hasta);
+    const abiertas = Object.values(estado.consignaciones).filter((c) => !c.anulada && !c.cerrada);
+    const porCliente = new Map();
+    const fila = (id, nombre) => {
+      if (!porCliente.has(id)) porCliente.set(id, { id, nombre, neto: 0, costo: 0, ordenes: 0, piezas: 0, enTienda: 0, valorTienda: 0, entregadas: 0, vendidas: 0, ultima: null, porCobrar: 0, porFacturar: 0 });
+      return porCliente.get(id);
+    };
+    ovs.forEach((o) => { const x = fila(o.clienteId, o.clienteNombre); x.neto += o.neto; x.costo += o.costo || 0; x.ordenes++; x.piezas += o.piezas; });
+    Object.values(estado.consignaciones).filter((c) => !c.anulada).forEach((c) => {
+      const x = fila(c.clienteId, c.clienteNombre);
+      c.lineas.forEach((l) => { x.entregadas += l.entregadas || 0; x.vendidas += l.vendidas || 0; });
+      if (!c.cerrada) { x.enTienda += piezasEnTienda(c); x.valorTienda += valorEnTienda(c); const u = ultimaVisita(c); if (!x.ultima || u > x.ultima) x.ultima = u; }
+    });
+    porFacturar().forEach((o) => { fila(o.clienteId, o.clienteNombre).porFacturar += o.total; });
+    facturas.filter((f) => !f.anulada && f.abierta).forEach((f) => { const c = estado.clientes[f.clienteId]; if (c?.tipo === 'empresa' || porCliente.has(f.clienteId)) fila(f.clienteId, f.clienteNombre).porCobrar += Math.max(0, (f.total || 0) - (f.pagado || 0)); });
+    const filas = [...porCliente.values()].map((x) => ({ ...x, nombre: estado.clientes[x.id] ? nombreCliente(estado.clientes[x.id]) : x.nombre }))
+      .sort((a, b) => b.neto - a.neto || b.valorTienda - a.valorTienda);
+    const tot = (k) => filas.reduce((s, x) => s + x[k], 0);
+    const margen = tot('neto') - tot('costo');
+    $('[data-resumen]', el).innerHTML = `
+      <div class="dato"><span class="dato-etq">Vendido a empresas, neto</span><span class="dato-valor">${pesos(tot('neto'))}</span></div>
+      <div class="dato"><span class="dato-etq">Margen ${info('Precio neto de las órdenes menos lo que costó hacer esas piezas.')}</span><span class="dato-valor">${pesos(margen)}${tot('neto') ? ` <small class="texto-suave">${Math.round(margen / tot('neto') * 100)} %</small>` : ''}</span></div>
+      <div class="dato"><span class="dato-etq">En consignación</span><span class="dato-valor">${numero(tot('enTienda'), 0)} · ${pesos(tot('valorTienda'))}</span></div>
+      <div class="dato ${tot('porCobrar') ? 'dato-alerta' : ''}"><span class="dato-etq">Por cobrar</span><span class="dato-valor">${pesos(tot('porCobrar'))}</span></div>`;
+    const cuerpo = $('[data-cuerpo]', el);
+    if (!filas.length) { cuerpo.innerHTML = vacio('Sin datos en este período', 'Aquí verás cuánto te compra cada tienda, cuánto vende en consignación, su margen y lo que te debe.'); return; }
+    const piezas = new Map();
+    ovs.forEach((o) => o.lineas.forEach((l) => { const x = piezas.get(l.nombre) || { n: 0, neto: 0 }; x.n += l.cantidad; x.neto += l.subtotal; piezas.set(l.nombre, x); }));
+    const top = [...piezas.entries()].sort((a, b) => b[1].n - a[1].n).slice(0, 8);
+    const maxN = Math.max(1, ...top.map(([, x]) => x.n));
+    cuerpo.innerHTML = `
+      <section class="panel tabla-panel"><ul class="filas">${filas.map((x) => {
+        const rot = x.entregadas ? Math.round(x.vendidas / x.entregadas * 100) : null;
+        const d = diasDesde(x.ultima);
+        return `<li><div class="fila">
+          <span class="fila-principal"><span class="fila-nombre">${esc(x.nombre)}</span>
+            <span class="fila-meta">
+              <span>${x.ordenes} orden${x.ordenes === 1 ? '' : 'es'} · ${numero(x.piezas, 0)} piezas${x.neto ? ` · margen ${Math.round((x.neto - x.costo) / x.neto * 100)} %` : ''}</span>
+              ${x.enTienda ? `<span>${numero(x.enTienda, 0)} en la tienda (${pesos(x.valorTienda)})</span>` : ''}
+              ${rot != null ? `<span>Vende ${rot} % de lo que dejas ${info('Piezas vendidas en consignación sobre las entregadas, desde siempre.')}</span>` : ''}
+              ${x.enTienda && d != null ? `<span class="${d >= 30 ? 'etiqueta etiqueta-alerta' : ''}">Última visita hace ${d} día${d === 1 ? '' : 's'}</span>` : ''}
+              ${x.porFacturar ? `<span class="etiqueta etiqueta-info">Por facturar ${pesos(x.porFacturar)}</span>` : ''}
+              ${x.porCobrar ? `<span class="etiqueta etiqueta-alerta">Debe ${pesos(x.porCobrar)}</span>` : ''}
+            </span></span>
+          <span class="fila-dato fila-dato-fuerte"><span class="fila-etq">Neto</span>${pesos(x.neto)}</span>
+        </div></li>`;
+      }).join('')}</ul></section>
+      ${top.length ? `<section class="panel"><h2>Lo que más piden las tiendas</h2><ul class="barras">${top.map(([n, x]) => `<li><span class="barra-etq">${esc(n)}</span><span class="barra-pista"><span class="barra" style="width:${Math.max(2, x.n / maxN * 100)}%"></span></span><span class="barra-valor">${numero(x.n, 0)} u</span></li>`).join('')}</ul></section>` : ''}`;
+  }
+  const des = [alCambiar(pintar), escucharDonde('facturas', 'abierta', '==', true, (l) => { facturas = l; pintar(); })];
+  pintar();
+  return () => des.forEach((u) => u());
 }

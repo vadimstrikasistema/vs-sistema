@@ -5,6 +5,8 @@ import { insumosActivos, bajoMinimo, escucharDonde } from '../stock.js';
 import { nombreUnidad } from '../comunes.js';
 import { ETAPAS } from '../piezas-core.js';
 import { itemsAgenda, sumar } from '../agenda-core.js';
+import { todasLasDeudas, deudores, configCobranza } from '../cobranza-gestion-core.js';
+import { consignacionesAbiertas, ultimaVisita } from '../b2b-core.js';
 
 function saludo() {
   const h = new Date().getHours();
@@ -75,7 +77,7 @@ function gastos() {
 // Lo que viene en la semana, desde la Agenda.
 function semana() {
   const hoy = hoyISO();
-  const its = itemsAgenda(hoy, sumar(hoy, 6), { facturas: resumenGastos.porCobrar, gastos: resumenGastos.porPagar }).filter((it) => !(it.origen === 'evento' && it.hecho) && !(it.origen === 'feria' && it.hecho));
+  const its = itemsAgenda(hoy, sumar(hoy, 6), { facturas: resumenGastos.porCobrar, gastos: resumenGastos.porPagar, ventasDeuda: resumenGastos.ventasDeuda || [] }).filter((it) => !(it.origen === 'evento' && it.hecho) && !(it.origen === 'feria' && it.hecho));
   if (!its.length) return '';
   const dia = (iso) => { const d = Math.round((new Date(`${iso}T12:00`) - new Date(`${hoy}T12:00`)) / 86400000); return d === 0 ? 'Hoy' : d === 1 ? 'Mañana' : new Date(`${iso}T12:00`).toLocaleDateString('es-CL', { weekday: 'short', day: 'numeric' }); };
   return `
@@ -103,23 +105,23 @@ function ventasHoy() {
 }
 
 function cobranza() {
-  const fs = resumenGastos.porCobrar.filter((f) => !f.anulada);
+  const ds = deudores(todasLasDeudas({ facturas: resumenGastos.porCobrar, ventas: resumenGastos.ventasDeuda || [] }));
   const ovs = Object.values(estado.ordenes || {}).filter((o) => !o.anulada && o.entregada && !o.facturada);
-  const cons = Object.values(estado.consignaciones || {}).filter((c) => !c.anulada && !c.cerrada);
-  if (!fs.length && !ovs.length && !cons.length) return '';
-  const hoy = hoyISO();
-  const saldoF = (f) => Math.max(0, (f.total || 0) - (f.pagado || 0));
-  const total = fs.reduce((s, f) => s + saldoF(f), 0);
-  const venc = fs.filter((f) => f.vencimiento && f.vencimiento < hoy);
-  const clientes = new Set(venc.map((f) => f.clienteId)).size;
+  const diasC = configCobranza().diasConsignacion;
+  const consAtras = consignacionesAbiertas().filter((c) => Math.round((new Date(`${hoyISO()}T12:00`) - new Date(`${ultimaVisita(c)}T12:00`)) / 86400000) >= diasC);
+  if (!ds.length && !ovs.length && !consAtras.length) return '';
+  const total = ds.reduce((s2, d) => s2 + d.total, 0);
+  const vencido = ds.reduce((s2, d) => s2 + d.vencido, 0);
+  const tocan = ds.filter((d) => ['amable', 'firme', 'ultimo', 'llamar'].includes(d.paso.accion));
   return `
         <section class="panel">
           <div class="panel-cabecera"><h2>Cobranza</h2><a href="#/cobranza/por-cobrar" class="enlace-chico">Ver por cobrar</a></div>
           <ul class="lista-bajos">
-            <li><a href="#/cobranza/por-cobrar">Por cobrar</a><span>${pesos(total)}</span></li>
-            ${venc.length ? `<li><a href="#/cobranza/por-cobrar">Vencido, ${clientes} cliente${clientes > 1 ? 's' : ''}</a><span class="texto-alerta">${pesos(venc.reduce((s, f) => s + saldoF(f), 0))}</span></li>` : ''}
-            ${ovs.length ? `<li><a href="#/ventas/por-facturar">Por facturar, ${ovs.length} orden${ovs.length > 1 ? 'es' : ''}</a><span class="texto-alerta">${pesos(ovs.reduce((s, o) => s + o.total, 0))}</span></li>` : ''}
-            ${cons.length ? `<li><a href="#/ventas/consignacion">En consignación, ${cons.length} tienda${cons.length > 1 ? 's' : ''}</a><span>${numero(cons.reduce((s, c) => s + c.lineas.reduce((t, l) => t + (l.entregadas || 0) - (l.vendidas || 0) - (l.devueltas || 0) - (l.perdidas || 0), 0), 0), 0)} piezas</span></li>` : ''}
+            ${ds.length ? `<li><a href="#/cobranza/por-cobrar">Te deben, ${ds.length} cliente${ds.length > 1 ? 's' : ''}</a><span>${pesos(total)}</span></li>` : ''}
+            ${vencido ? `<li><a href="#/cobranza/por-cobrar">Vencido</a><span class="texto-alerta">${pesos(vencido)}</span></li>` : ''}
+            ${tocan.length ? `<li><a href="#/cobranza/por-cobrar">Toca escribir hoy</a><span class="texto-alerta">${tocan.map((d) => esc(d.cliente.nombre || d.cliente.razonSocial || '')).slice(0, 3).join(', ')}${tocan.length > 3 ? '…' : ''}</span></li>` : ''}
+            ${ovs.length ? `<li><a href="#/empresas/por-facturar">Por facturar, ${ovs.length} orden${ovs.length > 1 ? 'es' : ''}</a><span class="texto-alerta">${pesos(ovs.reduce((s2, o) => s2 + o.total, 0))}</span></li>` : ''}
+            ${consAtras.length ? `<li><a href="#/cobranza/consignacion">Consignación sin visita hace ${diasC} días o más</a><span class="texto-alerta">${consAtras.length} tienda${consAtras.length > 1 ? 's' : ''}</span></li>` : ''}
           </ul>
         </section>`;
 }
@@ -228,6 +230,7 @@ export default {
       escucharDonde('alertasPrecio', 'visto', '==', false, (l) => { resumenGastos.alertas = l; pintar(); }),
       escucharDonde('lotes', 'estado', '==', 'en-proceso', (l) => { resumenGastos.lotes = l; pintar(); }),
       escucharDonde('facturas', 'abierta', '==', true, (l) => { resumenGastos.porCobrar = l; pintar(); }),
+      escucharDonde('ventas', 'deudaAbierta', '==', true, (l) => { resumenGastos.ventasDeuda = l; pintar(); }),
       escucharDonde('ventas', 'fecha', '==', hoyISO(), (l) => { resumenGastos.ventasHoy = l; pintar(); })
     ];
     return () => des.forEach((u) => u());
