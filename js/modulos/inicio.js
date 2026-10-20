@@ -3,6 +3,7 @@ import { estado, alCambiar } from '../datos.js';
 import { esc, fechaLarga, numero, pesos, hoyISO } from '../ui.js';
 import { insumosActivos, bajoMinimo, escucharDonde } from '../stock.js';
 import { nombreUnidad } from '../comunes.js';
+import { ETAPAS } from '../piezas-core.js';
 
 function saludo() {
   const h = new Date().getHours();
@@ -49,7 +50,7 @@ function pasos() {
 }
 
 // Resumen de gastos: se escucha mientras Inicio está abierto.
-const resumenGastos = { porClasificar: [], porPagar: [], alertas: [] };
+const resumenGastos = { porClasificar: [], porPagar: [], alertas: [], lotes: [] };
 function gastos() {
   const pend = resumenGastos.porClasificar.filter((g) => !g.anulado);
   const pp = resumenGastos.porPagar.filter((g) => !g.anulado);
@@ -67,6 +68,20 @@ function gastos() {
             ${vencidas.length ? item(pesos(vencidas.reduce((s, g) => s + (g.total || 0), 0)), `Vencido (${vencidas.length})`, '#/gastos/por-pagar', true) : ''}
             ${alertas.length ? item(alertas.length, 'Alertas de precio sin revisar', '#/gastos/alertas', true) : ''}
           </ul>
+        </section>`;
+}
+
+function taller() {
+  const ls = resumenGastos.lotes.filter((l) => !l.anulado);
+  if (!ls.length) return '';
+  const filas = ['modelado', 'seco', 'bizcochado', 'esmaltado'].map((k) => {
+    const n = ls.filter((l) => l.etapa === k).reduce((s, l) => s + l.cantidadActual, 0);
+    return n ? `<li><a href="#/produccion/lotes">${esc(ETAPAS[k].nombre)}</a><span>${n} pieza${n > 1 ? 's' : ''}</span></li>` : '';
+  }).join('');
+  return `
+        <section class="panel">
+          <div class="panel-cabecera"><h2>En el taller</h2><a href="#/produccion/lotes" class="enlace-chico">Ver lotes</a></div>
+          <ul class="lista-bajos">${filas}</ul>
         </section>`;
 }
 
@@ -128,6 +143,8 @@ export default {
           </ol>
         </section>
 
+        ${taller()}
+
         ${gastos()}
 
         ${bodega()}
@@ -136,8 +153,8 @@ export default {
           <h2>Cómo sigue el sistema</h2>
           <ol class="fases">
             <li class="fase-hecha"><strong>Base</strong><span>Acceso, configuración y listas.</span></li>
-            <li class="fase-actual"><strong>Producción, inventario y gastos</strong><span>Ya están insumos, recetas y bodega (2a) y gastos con XML o a mano que suman stock (2b). Siguen piezas, quemas y lotes por etapa con mermas (2c).</span></li>
-            <li><strong>Ventas y cobranza</strong><span>Venta rápida y ferias, clientes, consignaciones, órdenes de venta, facturación en el SII y cobros.</span></li>
+            <li class="fase-hecha"><strong>Producción, inventario y gastos</strong><span>Insumos, recetas y bodega; gastos con XML o a mano que suman stock; piezas, lotes por etapa con mermas y quemas.</span></li>
+            <li class="fase-actual"><strong>Ventas y cobranza</strong><span>Venta rápida y ferias, clientes, consignaciones, órdenes de venta, facturación en el SII y cobros.</span></li>
             <li><strong>Agenda y clases</strong><span>Calendario de quemas, ferias, clases, entregas y compromisos de pago.</span></li>
           </ol>
         </section>`;
@@ -147,7 +164,8 @@ export default {
       alCambiar(pintar),
       escucharDonde('gastos', 'estado', '==', 'por-clasificar', (l) => { resumenGastos.porClasificar = l; pintar(); }),
       escucharDonde('gastos', 'pagoEstado', '==', 'por-pagar', (l) => { resumenGastos.porPagar = l; pintar(); }),
-      escucharDonde('alertasPrecio', 'visto', '==', false, (l) => { resumenGastos.alertas = l; pintar(); })
+      escucharDonde('alertasPrecio', 'visto', '==', false, (l) => { resumenGastos.alertas = l; pintar(); }),
+      escucharDonde('lotes', 'estado', '==', 'en-proceso', (l) => { resumenGastos.lotes = l; pintar(); })
     ];
     return () => des.forEach((u) => u());
   }

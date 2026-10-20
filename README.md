@@ -7,7 +7,7 @@ Sistema de gestión del taller de cerámica Vadim Strika: producción por etapas
 - **Datos:** Firebase Firestore (plan gratuito Spark), con caché local para trabajar sin señal.
 - **Acceso:** Firebase Authentication con correo y contraseña, más una lista de correos permitidos.
 
-Versión actual: **0.3.0** (Fase 2, entrega 2b: gastos).
+Versión actual: **0.4.1** (Fase 2 completa, afinada con los datos del taller).
 
 ---
 
@@ -87,6 +87,8 @@ Estas decisiones se respetan en todas las fases:
 - **Duplicados:** mismo RUT + tipo + folio no se vuelve a ingresar. Mismo RUT y monto, otro folio y fecha a 7 días o menos se marca como posible duplicado.
 - **Aprendizaje:** la app recuerda cómo se clasificó cada producto de cada proveedor y lo sugiere la próxima vez. Cuando todas las líneas de una factura ya se clasificaron igual dos veces, se clasifica sola y queda marcada para revisar.
 - **Alertas de precio:** si un insumo llega 10 % más caro o más barato que la última vez, se crea una alerta con las recetas que lo usan.
+- **Piezas y lotes:** una ficha dice con qué se hace una pieza; su costo es un estimado con los precios de hoy. Un lote es una tanda real: al crearlo descuenta la pasta y suma las horas; en el secado se anotan las grietas y la arcilla puede volver a bodega; al esmaltar descuenta el esmalte; al terminar descuenta los otros insumos (embalaje) solo por las piezas buenas y suma las piezas a stock. Las piezas que se pierden reparten su costo entre las que quedan, así el costo por pieza es el real del taller.
+- **Quemas:** se registran al abrir el horno, con los lotes que iban y lo que salió. Su costo (kWh, horas × potencia, kg de gas o costo directo; si no hay dato, el estimado) se reparte según los puntos: S 1, M 2, L 4, XL 8. Una quema registrada no se modifica.
 - **Movimientos inmutables:** las reglas de Firestore no dejan cambiar un movimiento; solo marcarlo como anulado, y la anulación crea el movimiento contrario.
 
 ## Estructura de datos
@@ -96,6 +98,7 @@ Estas decisiones se respetan en todas las fases:
 | `config` | `sistema` | `schemaVersion`, cuándo y con qué versión se creó |
 | `config` | `empresa` | Nombre de fantasía, razón social, RUT, giro, dirección, contacto |
 | `config` | `costeo` | Método de costeo (`ultima` o `promedio`) e IVA |
+| `config` | `horno` | Energía (eléctrico o gas), precio del kWh y del gas, `hornos[]` (nombre, kWh promedio de bizcocho y de esmalte, capacidad en puntos), valor de la hora de trabajo, si se recicla la arcilla |
 | `listas` | una por lista | `nombre`, `descripcion`, `items[]` con `id`, `nombre`, `activo`, `orden` y `fijo` |
 | `insumos` | uno por material | `nombre`, `tipo`, `unidad`, `stockMinimo`, `formatos[]`, `costoRef`, `costoUltimo`, y el resumen `stock` y `valorStock`. `elaborado` y `recetaId` si lo produce una receta. `archivado` |
 | `recetas` | una por receta | `nombre`, `tipo` (esmalte, engobe, pasta, otro), `ingredientes[]` con `insumoId`, `pct` y `adicion`, `insumoId` del resultado, `notas` |
@@ -104,6 +107,10 @@ Estas decisiones se respetan en todas las fases:
 | `conteos` | uno por conteo físico | fecha, lo contado y la diferencia por insumo |
 | `gastos` | uno por factura, boleta o gasto sin documento | `origen` (xml o manual), `tipoDoc` (33, 34, 39, 61, 0…), `folio`, `fecha`, `mes`, `rutProveedor`, `rutLimpio`, `proveedor`, `neto`, `exento`, `iva`, `total`, `lineas[]` con su clase (`insumo` con `insumoId` y `factor`, o `gasto` con `itemGasto` y `area`), `estado` (por-clasificar o clasificado), `pagoEstado`, `pago`, `movs` (stock que generó), `automatico`, `revisado`, `anulado` |
 | `proveedores` | uno por RUT (sin puntos) | nombre, giro y lo aprendido: `items` (cómo se clasificó cada producto y cuántas veces igual) y `defecto` para líneas nuevas |
+| `piezas` | una por ficha (serie o pieza única) | `nombre`, `tipo`, `categoria`, `tamano` (S, M, L, XL), `pastaId` y `pastaKg`, `esmaltes[]` (insumo y gramos por pieza), `sinEsmalte`, `otros[]`, `horas`, `precioB2C` (con IVA), `precioB2B` (neto), y el resumen `stock`, `stockSegunda`, `valorStock`, `costoUltimo`; `estadoUnica` en piezas únicas |
+| `lotes` | uno por tanda de piezas | pieza, `cantidadInicial`, `cantidadActual`, `etapa` (modelado, seco, bizcochado, esmaltado, terminado), `estado`, `historial[]` de cada etapa con lo que entró, salió y se perdió (y por qué), costos acumulados (`costoPasta`, `costoEsmalte`, `costoOtros`, `costoHoras`, `costoQuemas`, `creditoReciclaje`), al terminar `primera`, `segunda`, `costoUnitario`, y los movimientos que generó |
+| `quemas` | una por quema | `tipo` (bizcocho o esmalte), fecha, cono, `energia` y `costo`, `puntos` y `ocupacion`, y por lote: piezas, puntos, costo asignado y lo que salió |
+| `movPiezas` | uno por entrada o salida de piezas terminadas | pieza, `calidad` (primera o segunda), `cantidad` con signo, costo, `tipo` (produccion, ajuste, anulacion), motivo, `anulado` |
 | `alertasPrecio` | una por cambio de precio de 10 % o más | insumo, costo anterior y nuevo, variación, proveedor, documento, recetas afectadas, `visto` |
 
 Listas iniciales: tipos de insumo, unidades, categorías de pieza, canales de venta, medios de pago, áreas del negocio, ítems de gasto, motivos de merma y motivos de ajuste de inventario.
@@ -135,11 +142,27 @@ fonts/, img/            tipografías y logo (incluidos para funcionar sin señal
 2. **Producción, inventario y gastos**, en tres entregas:
    - **2a** · insumos con formatos de compra y calculadora de costo, recetas de esmaltes, engobes y pastas por porcentaje, preparación que descuenta y suma stock, bodega con inventario inicial, ajustes, conteo físico e historial. ✔
    - **2b** · gastos con XML del SII o a mano; cada línea como insumo (suma stock) o gasto general, con aprendizaje por proveedor, duplicados, alertas de precio, por pagar y análisis mensual. ✔ Pendiente para más adelante: conciliación con la cartola del banco, cuentas recurrentes y foto de boletas.
-   - **2c** · fichas de pieza (pasta, esmalte, horas, tamaño S, M, L, XL en el horno), quemas con horno eléctrico o a gas, lotes por etapa con mermas, piezas de segunda, inventario de piezas.
+   - **2c** · fichas de pieza (pasta, esmalte, horas, tamaño S, M, L, XL en el horno) con costo y margen, lotes por etapa con mermas y reciclaje de arcilla, quemas con horno eléctrico o a gas y costo repartido, piezas de primera y de segunda, inventario de piezas con ajustes. ✔ Pendiente: fotos de las piezas (requiere decidir dónde guardarlas) y quemas programadas en la Agenda (fase 4).
 3. **Ventas y cobranza** · venta rápida y ferias, clientes, consignaciones con liquidación, órdenes de venta con PDF y WhatsApp, por facturar con el favorito que rellena el facturador del SII, encargos con abono, cobranza y pagos.
 4. **Agenda y clases** · calendario con quemas, ferias, clases, entregas y compromisos de pago.
 
 ## Historial de versiones
+
+### 0.4.1 · Ajustes con los datos del taller
+- Varios hornos (parte con tres eléctricos, 278 kWh por bizcocho y 558 kWh por esmalte), cada uno con su nombre, consumo promedio y capacidad.
+- Al registrar una quema se elige el horno, y la energía se toma del promedio del horno, de la lectura del remarcador, de los kWh o de un costo directo.
+- Cada quema muestra y guarda su valor vendible y su valor en merma, a precio de venta.
+- Precio de segunda opcional en la ficha.
+
+### 0.4.0 · Fase 2, entrega 2c: piezas, lotes y quemas
+- **Producción → Piezas:** fichas de serie o pieza única con categoría, tamaño en el horno, pasta, esmaltes, otros insumos, horas y precios; desglose del costo y margen de venta directa y a tiendas.
+- **Producción → Lotes:** tablero por etapa (modelado y secado, espera bizcocho, espera esmalte, esmaltado). Registrar secado con mermas y reciclaje, esmaltar (también en crudo), terminar sin esmalte, ver el recorrido y el costo real de cada lote, anular lotes en proceso.
+- **Producción → Quemas:** registrar quemas de bizcocho y de esmalte con su energía, ocupación del horno, lo que salió de cada lote (primera, segunda, perdidas con motivo) y el costo repartido por tamaño.
+- **Inventario → Piezas:** piezas de primera, de segunda, en proceso por etapa y valor; ajustes de piezas (incluye inventario inicial de piezas ya hechas) con historial y anulación.
+- **Configuración → Horno y trabajo:** valor de la hora, energía del horno, precios, capacidad y reciclaje de arcilla, con el costo estimado de cada quema.
+- **Inicio:** panel «En el taller» con las piezas por etapa.
+- **Reglas de Firestore nuevas** para piezas, lotes, quemas, movimientos de piezas y la configuración del horno. **Hay que volver a publicarlas.**
+- Estructura de datos versión 4 (se actualiza sola al entrar).
 
 ### 0.3.0 · Fase 2, entrega 2b: gastos
 - **Gastos → Documentos:** carga de XML del SII (uno o varios archivos, con varias facturas cada uno, en ISO-8859-1 o UTF-8), arrastrando o eligiendo archivos. Detecta facturas ya ingresadas, posibles duplicados, facturas emitidas por la propia empresa y facturas a otro RUT.

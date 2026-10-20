@@ -12,8 +12,9 @@ import {
   opcionesLista, opcionesInsumos, nombreUnidad, campoNumero, vacio, pestanas, avisoError, avisoGuardado
 } from '../comunes.js';
 import { ICONOS } from '../iconos.js';
+import { vistaPiezas, vistaLotes, vistaQuemas } from './produccion-piezas.js';
 
-const PEST = [['insumos', 'Insumos'], ['recetas', 'Recetas'], ['piezas', 'Piezas y lotes']];
+const PEST = [['insumos', 'Insumos'], ['recetas', 'Recetas'], ['piezas', 'Piezas'], ['lotes', 'Lotes'], ['quemas', 'Quemas']];
 const fallo = avisoError(toast);
 
 export default {
@@ -26,24 +27,18 @@ export default {
           ? 'Esmaltes, engobes y pastas que se preparan en el taller. Al preparar una receta, sus materias primas salen de bodega y entra lo preparado.'
           : actual === 'insumos'
             ? 'Todos los materiales del taller: arcillas, materias primas, esmaltes, embalaje. Aquí se definen; el stock se ve en Inventario.'
-            : 'Fichas de pieza, quemas y lotes por etapa.'}</p>
+            : actual === 'piezas' ? 'Cada pieza o serie con lo que lleva, su costo y su margen.'
+              : actual === 'lotes' ? 'Las piezas en proceso, por etapa. Al avanzar se descuentan los materiales y se anota lo que se pierde.'
+                : 'Cada quema con su energía, lo que salió de cada lote y cómo se repartió el costo.'}</p>
       </header>
       ${pestanas('produccion', PEST, actual)}
       <div id="prod-cuerpo"></div>`;
     const cuerpo = $('#prod-cuerpo', el);
     if (actual === 'insumos') return vistaInsumos(cuerpo);
     if (actual === 'recetas') return vistaRecetas(cuerpo);
-    cuerpo.innerHTML = `
-      <section class="panel pendiente">
-        <p class="pendiente-fase">Llega en la entrega 2c</p>
-        <ul class="lista-puntos">
-          <li>Fichas de pieza: pasta, esmalte, horas de trabajo y tamaño en el horno (S, M, L, XL)</li>
-          <li>Series con receta y precio fijo, y piezas únicas con foto y estado</li>
-          <li>Lotes que avanzan por modelado, secado, bizcocho, esmaltado y quema de esmalte</li>
-          <li>Mermas con motivo, piezas de segunda y arcilla de secado que vuelve a bodega</li>
-          <li>Quemas con horno eléctrico o a gas, y su costo repartido según el tamaño de cada pieza</li>
-        </ul>
-      </section>`;
+    if (actual === 'piezas') return vistaPiezas(cuerpo);
+    if (actual === 'lotes') return vistaLotes(cuerpo);
+    if (actual === 'quemas') return vistaQuemas(cuerpo);
     return null;
   }
 };
@@ -328,7 +323,7 @@ function vistaRecetas(el) {
             <span class="tarjeta-nombre">${esc(r.nombre)}</span>
             <span class="tarjeta-detalle">${(r.ingredientes || []).length} ingredientes${Math.abs(base - 100) > 0.01 ? ` · <span class="texto-alerta">base suma ${numero(base)} %</span>` : ''}</span>
             <dl class="tarjeta-datos">
-              <div><dt>Costo por kg</dt><dd>${porGramo ? pesos(porGramo * 1000) : '—'}${faltan.length ? ` ${info(`Falta costo para: ${faltan.join(', ')}. Agrega su costo de referencia en Insumos o regístralo en el inventario inicial.`)}` : ''}</dd></div>
+              <div><dt>Costo por kg</dt><dd>${porGramo ? pesos(porGramo * 1000) : '—'}${faltan.length ? ` <span class="texto-alerta" title="${esc(`Falta costo para: ${faltan.join(', ')}`)}">incompleto</span>` : ''}</dd></div>
               <div><dt>En bodega</dt><dd>${res ? `${numero(res.stock || 0)} ${esc(nombreUnidad(res.unidad))}` : '—'}</dd></div>
             </dl>
           </button>

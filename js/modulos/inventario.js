@@ -8,6 +8,8 @@ import {
 } from '../stock.js';
 import { opcionesLista, opcionesInsumos, nombreUnidad, campoNumero, vacio, pestanas, avisoError, avisoGuardado } from '../comunes.js';
 import { editarInsumo } from './produccion.js';
+import { ETAPAS, movimientoPieza, costoFicha } from '../piezas-core.js';
+import { escucharDonde, documentosPorCampo, refDoc } from '../stock.js';
 
 const PEST = [['bodega', 'Bodega'], ['movimientos', 'Movimientos'], ['piezas', 'Piezas']];
 const fallo = avisoError(toast);
@@ -30,17 +32,7 @@ export default {
     const c = $('#inv-cuerpo', el);
     if (actual === 'bodega') return vistaBodega(c);
     if (actual === 'movimientos') return vistaMovimientos(c);
-    c.innerHTML = `
-      <section class="panel pendiente">
-        <p class="pendiente-fase">Llega en la entrega 2c</p>
-        <ul class="lista-puntos">
-          <li>Stock de piezas terminadas por ubicación: bodega o local de cada cliente</li>
-          <li>Piezas en proceso por etapa: «12 tazas en secado, 30 en bizcocho»</li>
-          <li>Piezas de segunda con su propio precio</li>
-          <li>Piezas únicas con foto y estado: disponible, reservada, vendida</li>
-        </ul>
-      </section>`;
-    return null;
+    return vistaPiezasInv(c);
   }
 };
 
@@ -437,4 +429,149 @@ function vistaMovimientos(el) {
   }
   cargar();
   return null;
+}
+
+// ================================================================ Piezas terminadas
+function vistaPiezasInv(el) {
+  let lotes = [];
+  el.innerHTML = `
+    <div class="resumen" data-resumen></div>
+    <div data-proceso></div>
+    <div class="barra-herramientas"><span class="espacio"></span><button class="btn btn-primario" data-ajuste>Ajuste de piezas</button></div>
+    <div data-lista></div>`;
+  $('[data-ajuste]', el).addEventListener('click', () => ajustePiezas());
+  const pintar = () => {
+    const fichas = Object.values(estado.piezas).filter((p) => !p.archivado).sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'));
+    const activos = lotes.filter((l) => !l.anulado);
+    const primera = fichas.reduce((s, p) => s + (p.stock || 0), 0);
+    const segunda = fichas.reduce((s, p) => s + (p.stockSegunda || 0), 0);
+    const valor = fichas.reduce((s, p) => s + (p.valorStock || 0), 0);
+    const proceso = activos.reduce((s, l) => s + l.cantidadActual, 0);
+    $('[data-resumen]', el).innerHTML = `
+      <div class="dato"><span class="dato-etq">Terminadas de primera</span><span class="dato-valor">${numero(primera, 0)}</span></div>
+      <div class="dato"><span class="dato-etq">De segunda</span><span class="dato-valor">${numero(segunda, 0)}</span></div>
+      <div class="dato"><span class="dato-etq">En proceso</span><span class="dato-valor">${numero(proceso, 0)}</span></div>
+      <div class="dato"><span class="dato-etq">Valor de lo terminado ${info('Lo que costó hacer las piezas que hay en stock, con sus mermas, horas y quemas.')}</span><span class="dato-valor">${pesos(valor)}</span></div>`;
+    const porEtapa = ['modelado', 'seco', 'bizcochado', 'esmaltado'].map((k) => {
+      const ls = activos.filter((l) => l.etapa === k);
+      const grupos = new Map();
+      ls.forEach((l) => grupos.set(l.piezaNombre, (grupos.get(l.piezaNombre) || 0) + l.cantidadActual));
+      return { k, txt: [...grupos.entries()].map(([n, c]) => `${c} ${n}`).join(', ') };
+    }).filter((x) => x.txt);
+    $('[data-proceso]', el).innerHTML = porEtapa.length ? `
+      <section class="panel"><div class="panel-cabecera"><h2>En proceso</h2><a class="enlace-chico" href="#/produccion/lotes">Ver lotes</a></div>
+        <ul class="lista-bajos">${porEtapa.map((x) => `<li><span>${esc(ETAPAS[x.k].nombre)}</span><span>${esc(x.txt)}</span></li>`).join('')}</ul></section>` : '';
+    const lista = $('[data-lista]', el);
+    if (!fichas.length) { lista.innerHTML = vacio('Sin piezas todavía', 'Crea las fichas en Producción → Piezas. Las que ya tienes hechas puedes cargarlas aquí con «Ajuste de piezas» y motivo «Inventario inicial».', '<a class="btn btn-primario" href="#/produccion/piezas">Crear fichas</a>'); return; }
+    lista.innerHTML = `<section class="panel tabla-panel"><ul class="filas">${fichas.map((p) => {
+      const enP = activos.filter((l) => l.piezaId === p.id).reduce((s, l) => s + l.cantidadActual, 0);
+      return `<li><button class="fila" data-id="${esc(p.id)}">
+        <span class="fila-principal"><span class="fila-nombre">${esc(p.nombre)}</span>
+          <span class="fila-meta"><span>${esc(nombreItem('categoriasPieza', p.categoria))} · ${esc(p.tamano)}</span>${enP ? `<span>${enP} en proceso</span>` : ''}${p.tipo === 'unica' ? `<span class="etiqueta">${esc({ disponible: 'Disponible', reservada: 'Reservada', vendida: 'Vendida' }[p.estadoUnica] || 'Única')}</span>` : ''}</span></span>
+        <span class="fila-dato fila-dato-fuerte"><span class="fila-etq">Primera</span>${numero(p.stock || 0, 0)}</span>
+        <span class="fila-dato"><span class="fila-etq">Segunda</span>${numero(p.stockSegunda || 0, 0)}</span>
+      </button></li>`;
+    }).join('')}</ul></section>`;
+    $$('.fila', lista).forEach((b) => b.addEventListener('click', () => detallePieza(estado.piezas[b.dataset.id])));
+  };
+  const des = [alCambiar(pintar), escucharDonde('lotes', 'estado', '==', 'en-proceso', (l) => { lotes = l; pintar(); })];
+  pintar();
+  return () => des.forEach((u) => u());
+}
+
+async function detallePieza(p) {
+  await formulario({
+    titulo: p.nombre, ancho: true, textoGuardar: '',
+    extra: '<button type="button" class="btn btn-suave" data-ajustar>Ajustar</button>',
+    cuerpo: `
+      <div class="resumen resumen-chico">
+        <div class="dato"><span class="dato-etq">De primera</span><span class="dato-valor">${numero(p.stock || 0, 0)}</span></div>
+        <div class="dato"><span class="dato-etq">De segunda</span><span class="dato-valor">${numero(p.stockSegunda || 0, 0)}</span></div>
+        <div class="dato"><span class="dato-etq">Costo real del último lote</span><span class="dato-valor">${p.costoUltimo ? pesos(p.costoUltimo) : '—'}</span></div>
+      </div>
+      <h3>Movimientos</h3><div data-hist><p class="texto-suave">Cargando…</p></div>`,
+    async montar(dlg, form, cerrar) {
+      $('[data-ajustar]', dlg).addEventListener('click', () => { cerrar(); ajustePiezas(p.id); });
+      const caja = $('[data-hist]', dlg);
+      try {
+        const movs = (await documentosPorCampo('movPiezas', 'piezaId', p.id)).sort((a, b) => b.fecha.localeCompare(a.fecha) || b.creadoMs - a.creadoMs);
+        if (!movs.length) { caja.innerHTML = '<p class="texto-suave">Sin movimientos todavía.</p>'; return; }
+        caja.innerHTML = `<ul class="movs">${movs.slice(0, 100).map((m) => `
+          <li class="mov ${m.anulado ? 'anulado' : ''}">
+            <span class="mov-fecha">${fechaCorta(m.fecha)}</span>
+            <span class="mov-desc"><span>${esc(m.tipo === 'produccion' ? 'Sale del horno' : m.tipo === 'anulacion' ? 'Anulación' : `Ajuste · ${nombreItem('motivosAjuste', m.motivo)}`)}${m.calidad === 'segunda' ? ' · de segunda' : ''}${m.nota ? ` · ${esc(m.nota)}` : ''}</span>
+              <span class="texto-tenue mov-quien">${esc((m.actualizadoPor || '').split('@')[0])}</span></span>
+            <span class="mov-cant ${m.cantidad >= 0 ? 'entra' : 'sale'}">${m.cantidad >= 0 ? '+' : '−'}${numero(Math.abs(m.cantidad), 0)} u</span>
+            <span class="mov-valor">${pesos(Math.abs(m.valor || 0))}</span>
+            <span class="mov-acc">${m.anulado ? '<span class="etiqueta etiqueta-suave">Anulado</span>' : m.tipo === 'ajuste' ? `<button type="button" class="btn-enlace" data-anular="${esc(m.id)}">Anular</button>` : ''}</span>
+          </li>`).join('')}</ul>`;
+        $$('[data-anular]', caja).forEach((b) => b.addEventListener('click', async () => {
+          const m = movs.find((x) => x.id === b.dataset.anular);
+          if (!(await confirmar('Anular ajuste', `Se registra el movimiento contrario (${m.cantidad >= 0 ? '−' : '+'}${Math.abs(m.cantidad)} u) y este queda anulado.`, 'Anular', true))) return;
+          const lote = nuevoLote();
+          const contra = movimientoPieza(lote, { piezaId: p.id, calidad: m.calidad, cantidad: -m.cantidad, costoUnitario: m.cantidad < 0 ? m.costoUnitario : null, tipo: 'anulacion', fecha: m.fecha, ref: { tipo: 'movPieza', id: m.id } });
+          lote.update(refDoc('movPiezas', m.id), { anulado: true, anuladoEn: Date.now(), anulacionId: contra.id, ...firma() });
+          enviar(lote.commit(), { alGuardar: avisoGuardado(toast, 'Ajuste anulado'), alFallar: fallo });
+          cerrar();
+        }));
+      } catch (e) {
+        console.error(e);
+        caja.innerHTML = '<p class="texto-suave">No se pudo cargar el historial. Revisa la conexión.</p>';
+      }
+    }
+  });
+}
+
+async function ajustePiezas(piezaId = '') {
+  const fichas = Object.values(estado.piezas).filter((p) => !p.archivado).sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'));
+  if (!fichas.length) { toast('Primero crea las fichas en Producción → Piezas.', 'aviso'); return; }
+  const motivos = itemsActivos('motivosAjuste').filter((m) => m.id !== 'conteo-fisico');
+  await formulario({
+    titulo: 'Ajuste de piezas', textoGuardar: 'Registrar ajuste',
+    cuerpo: `
+      <p class="texto-suave">Para piezas terminadas que entran o salen sin pasar por un lote ni una venta: las que ya tenías hechas (inventario inicial), una que se rompió en bodega, un regalo. ${info('Las piezas que entran necesitan un costo por unidad para valorizar el stock. Viene precargado con el costo de la ficha; cámbialo si sabes el real.')}</p>
+      <div class="campos">
+        <label class="campo campo-ancho"><span class="campo-etiqueta">Pieza</span><select name="pieza">${fichas.map((p) => `<option value="${esc(p.id)}" ${p.id === piezaId ? 'selected' : ''}>${esc(p.nombre)}</option>`).join('')}</select></label>
+        <div class="campo campo-ancho"><div class="segmentado" role="radiogroup">
+          <label><input type="radio" name="sentido" value="ingreso" checked><span>Entran</span></label>
+          <label><input type="radio" name="sentido" value="salida"><span>Salen</span></label>
+        </div></div>
+        <div class="campo campo-ancho"><div class="segmentado segmentado-chico" role="radiogroup">
+          <label><input type="radio" name="calidad" value="primera" checked><span>De primera</span></label>
+          <label><input type="radio" name="calidad" value="segunda"><span>De segunda</span></label>
+        </div></div>
+        ${campoNumero('cantidad', 'Piezas', '', { requerido: true, sufijo: 'u' })}
+        <label class="campo"><span class="campo-etiqueta">Motivo <span class="req">*</span></span><select name="motivo"><option value="">Elige un motivo</option>${motivos.map((m) => `<option value="${esc(m.id)}">${esc(m.nombre)}</option>`).join('')}</select></label>
+        <div data-costo class="campo-ancho">${campoNumero('costo', 'Costo por pieza', '', { sufijo: '$' })}</div>
+        <label class="campo"><span class="campo-etiqueta">Fecha</span><input type="date" name="fecha" value="${hoyISO()}" max="${hoyISO()}"></label>
+        <label class="campo"><span class="campo-etiqueta">Nota</span><input name="nota" maxlength="200" placeholder="Opcional"></label>
+      </div>`,
+    montar(dlg, form) {
+      const v = () => {
+        const p = estado.piezas[form.pieza.value];
+        $('[data-costo]', dlg).hidden = form.sentido.value !== 'ingreso';
+        if (!form.costo.dataset.tocado) form.costo.value = numero(p.costoUltimo || costoFicha(p).total, 0);
+      };
+      form.costo.addEventListener('input', () => { form.costo.dataset.tocado = '1'; });
+      form.pieza.addEventListener('change', () => { delete form.costo.dataset.tocado; });
+      dlg.addEventListener('change', v);
+      v();
+    },
+    guardar(form) {
+      const p = estado.piezas[form.pieza.value];
+      const c = leerNumero(form.cantidad.value);
+      if (!Number.isInteger(c) || c <= 0) return 'Escribe un número entero de piezas.';
+      if (!form.motivo.value) return 'Elige el motivo del ajuste.';
+      const ingreso = form.sentido.value === 'ingreso';
+      const calidad = form.calidad.value;
+      const hay = calidad === 'segunda' ? (p.stockSegunda || 0) : (p.stock || 0);
+      if (!ingreso && c > hay) return `Solo hay ${hay} de ${calidad}.`;
+      const costo = ingreso ? leerNumero(form.costo.value) : null;
+      if (ingreso && !(costo >= 0)) return 'Escribe el costo por pieza.';
+      const lote = nuevoLote();
+      movimientoPieza(lote, { piezaId: p.id, calidad, cantidad: ingreso ? c : -c, costoUnitario: ingreso ? costo : null, tipo: 'ajuste', fecha: form.fecha.value || hoyISO(), motivo: form.motivo.value, nota: form.nota.value.trim() });
+      enviar(lote.commit(), { alGuardar: avisoGuardado(toast, `Ajuste registrado: ${ingreso ? '+' : '−'}${c} ${p.nombre}`), alFallar: fallo });
+      return null;
+    }
+  });
 }

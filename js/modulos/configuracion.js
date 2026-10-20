@@ -1,16 +1,18 @@
 // Configuración: datos de la empresa, costeo, listas editables y sistema.
 import {
-  estado, alCambiar, enviar, guardarEmpresa, guardarCosteo,
+  estado, alCambiar, enviar, guardarEmpresa, guardarCosteo, guardarHorno,
   validarNombre, agregarItem, renombrarItem, cambiarVisibilidad, moverItem
 } from '../datos.js';
 import { auth } from '../firebase.js';
 import { APP_VERSION, SCHEMA_VERSION, CORREOS_PERMITIDOS } from '../config.js';
-import { esc, info, toast, dialogo, $, $$, rutValido, formatearRut } from '../ui.js';
+import { esc, info, toast, dialogo, $, $$, rutValido, formatearRut, leerNumero, numero, pesos } from '../ui.js';
+import { horno as configHorno, TAMANOS, costoQuemaEstimado, costoPorPunto } from '../piezas-core.js';
 import { ICONOS } from '../iconos.js';
 
 const PESTANAS = [
   ['empresa', 'Empresa'],
   ['costeo', 'Costeo'],
+  ['horno', 'Horno y trabajo'],
   ['listas', 'Listas'],
   ['sistema', 'Sistema']
 ];
@@ -34,7 +36,7 @@ export default {
       </nav>
       <div id="conf-cuerpo"></div>`;
     const cuerpo = $('#conf-cuerpo', el);
-    const secciones = { empresa, costeo, listas, sistema };
+    const secciones = { empresa, costeo, horno, listas, sistema };
     return secciones[pestana](cuerpo);
   }
 };
@@ -138,6 +140,131 @@ function costeo(el) {
         pintar();
       }
     }));
+  };
+  pintar();
+  return alCambiar(pintar);
+}
+
+// ---------------------------------------------------------------- Horno y trabajo
+const num = (v, d = 2) => (v || v === 0 ? numero(v, d) : '');
+function horno(el) {
+  let sucio = false;
+  const pintar = () => {
+    if (sucio) return;
+    const h = configHorno();
+    el.innerHTML = `
+      <form class="panel formulario" id="form-horno" novalidate>
+        <h2>Trabajo</h2>
+        <div class="campos">
+          <label class="campo">
+            <span class="campo-etiqueta">Valor de tu hora de trabajo ${info('Cuánto quieres que valga una hora de tu trabajo. Se suma al costo de cada pieza según las horas de su ficha. Si lo dejas en 0, el costo solo incluye materiales y quemas.')}</span>
+            <span class="con-sufijo"><input name="valorHora" inputmode="decimal" value="${num(h.valorHora, 0)}" placeholder="0"><span class="sufijo">$/hora</span></span>
+          </label>
+        </div>
+
+        <h2 class="separado">Hornos</h2>
+        <div class="campo campo-ancho">
+          <span class="campo-etiqueta">Energía ${info('Con qué funcionan los hornos. Define cómo se calcula el costo de cada quema.')}</span>
+          <div class="segmentado" role="radiogroup">
+            <label><input type="radio" name="energia" value="electrico" ${h.energia !== 'gas' ? 'checked' : ''}><span>Eléctricos</span></label>
+            <label><input type="radio" name="energia" value="gas" ${h.energia === 'gas' ? 'checked' : ''}><span>A gas</span></label>
+          </div>
+        </div>
+        <div class="campos" data-electrico>
+          <label class="campo"><span class="campo-etiqueta">Precio del kWh ${info('Divide el total de la boleta de luz por los kWh que marca. Ej.: $54.000 ÷ 300 kWh = $180 por kWh.')}</span>
+            <span class="con-sufijo"><input name="precioKwh" inputmode="decimal" value="${num(h.precioKwh)}"><span class="sufijo">$/kWh</span></span></label>
+        </div>
+        <div class="campos" data-gas>
+          <label class="campo"><span class="campo-etiqueta">Precio del gas</span>
+            <span class="con-sufijo"><input name="precioGasKg" inputmode="decimal" value="${num(h.precioGasKg)}"><span class="sufijo">$/kg</span></span></label>
+          <span></span>
+          <label class="campo"><span class="campo-etiqueta">Gas en una quema de bizcocho</span>
+            <span class="con-sufijo"><input name="gasKgBizcocho" inputmode="decimal" value="${num(h.gasKgBizcocho)}"><span class="sufijo">kg</span></span></label>
+          <label class="campo"><span class="campo-etiqueta">Gas en una quema de esmalte</span>
+            <span class="con-sufijo"><input name="gasKgEsmalte" inputmode="decimal" value="${num(h.gasKgEsmalte)}"><span class="sufijo">kg</span></span></label>
+        </div>
+        <p class="sub-etiqueta">Cada horno ${info('El consumo promedio se usa cuando registras una quema sin leer el remarcador. La capacidad es cuántos puntos caben en el horno lleno: S 1, M 2, L 4, XL 8 (si caben 40 tazas chicas, son 40 puntos). Sirve para ver qué tan lleno fue y para estimar el costo de quema de cada ficha.')}</p>
+        <div class="hornos-cabeza"><span>Nombre</span><span>kWh bizcocho</span><span>kWh esmalte</span><span>Capacidad</span><span></span></div>
+        <div data-hornos></div>
+        <button type="button" class="btn btn-suave btn-chico" data-agregar-horno>${ICONOS.mas2}<span>Agregar horno</span></button>
+        <div class="campos">
+          <label class="campo interruptor-campo"><span class="campo-etiqueta">Arcilla del secado ${info('Las piezas que se agrietan antes del bizcocho se pueden rehidratar y volver a usar. Si está marcado, al registrar el secado esa arcilla vuelve a bodega por defecto.')}</span>
+            <span class="interruptor"><input type="checkbox" name="reciclaArcilla" ${h.reciclaArcilla ? 'checked' : ''}><span>Se recicla y vuelve a bodega</span></span></label>
+        </div>
+        <dl class="datos-fijos compacto" data-estimado></dl>
+        <div class="formulario-pie"><button class="btn btn-primario" type="submit">Guardar</button></div>
+      </form>
+      <section class="panel">
+        <h2>Tamaños en el horno</h2>
+        <p class="texto-suave">Cada ficha de pieza lleva un tamaño. El costo de cada quema se reparte entre los lotes según los puntos que ocupan.</p>
+        <table class="tabla"><thead><tr><th>Tamaño</th><th class="num">Puntos</th><th>Por ejemplo</th></tr></thead><tbody>
+          ${Object.entries(TAMANOS).map(([k, t]) => `<tr><td>${esc(t.nombre)}</td><td class="num">${t.puntos}</td><td class="texto-suave">${esc(t.ejemplo)}</td></tr>`).join('')}
+        </tbody></table>
+      </section>`;
+    const f = $('#form-horno', el);
+    const caja = $('[data-hornos]', el);
+    const filaHorno = (x) => {
+      const div = document.createElement('div');
+      div.className = 'horno-fila';
+      div.dataset.id = x.id;
+      div.innerHTML = `
+        <input data-n value="${esc(x.nombre)}" maxlength="40" aria-label="Nombre del horno">
+        <span class="con-sufijo"><input data-b inputmode="decimal" value="${num(x.kwhBizcocho, 1)}" aria-label="kWh por quema de bizcocho"><span class="sufijo">kWh</span></span>
+        <span class="con-sufijo"><input data-e inputmode="decimal" value="${num(x.kwhEsmalte, 1)}" aria-label="kWh por quema de esmalte"><span class="sufijo">kWh</span></span>
+        <span class="con-sufijo"><input data-c inputmode="decimal" value="${num(x.capacidadPuntos, 0)}" aria-label="Capacidad en puntos"><span class="sufijo">pts</span></span>
+        <button type="button" class="btn-icono" aria-label="Quitar horno">✕</button>`;
+      div.querySelector('button').addEventListener('click', () => {
+        if ($$('.horno-fila', caja).length === 1) { toast('Tiene que quedar al menos un horno.', 'error'); return; }
+        div.remove(); sucio = true; vista();
+      });
+      caja.append(div);
+    };
+    h.hornos.forEach(filaHorno);
+    $('[data-agregar-horno]', el).addEventListener('click', () => {
+      const n = $$('.horno-fila', caja).length + 1;
+      filaHorno({ id: `h${Date.now().toString(36)}`, nombre: `Horno ${n}`, kwhBizcocho: 278, kwhEsmalte: 558, capacidadPuntos: 40 });
+      sucio = true; vista();
+    });
+    const leer = () => {
+      const d = {};
+      ['valorHora', 'precioKwh', 'precioGasKg', 'gasKgBizcocho', 'gasKgEsmalte'].forEach((k) => {
+        const v = leerNumero(f.elements[k].value);
+        d[k] = Number.isFinite(v) ? v : 0;
+      });
+      d.energia = f.energia.value;
+      d.reciclaArcilla = f.reciclaArcilla.checked;
+      d.hornos = $$('.horno-fila', caja).map((r) => ({
+        id: r.dataset.id,
+        nombre: r.querySelector('[data-n]').value.trim() || 'Horno',
+        kwhBizcocho: leerNumero(r.querySelector('[data-b]').value) || 0,
+        kwhEsmalte: leerNumero(r.querySelector('[data-e]').value) || 0,
+        capacidadPuntos: leerNumero(r.querySelector('[data-c]').value) || 0
+      }));
+      return d;
+    };
+    const vista = () => {
+      const d = leer();
+      $('[data-electrico]', el).hidden = d.energia === 'gas';
+      $('[data-gas]', el).hidden = d.energia !== 'gas';
+      $$('.hornos-cabeza span:nth-child(2), .hornos-cabeza span:nth-child(3), .horno-fila .con-sufijo:nth-of-type(1), .horno-fila .con-sufijo:nth-of-type(2)', el).forEach((x) => { x.hidden = d.energia === 'gas'; });
+      const prev = estado.horno;
+      estado.horno = { ...(prev || {}), ...d };
+      const filas = d.hornos.map((x) => `<div><dt>${esc(x.nombre)}: bizcocho y esmalte</dt><dd>${pesos(costoQuemaEstimado('bizcocho', x.id))} · ${pesos(costoQuemaEstimado('esmalte', x.id))}</dd></div>`).join('');
+      const pp = costoPorPunto(true);
+      estado.horno = prev;
+      $('[data-estimado]', el).innerHTML = `${filas}
+        <div><dt>Por punto, las dos quemas ${info('Lo que carga una pieza S en las dos quemas con el horno lleno, promediando los hornos. Una M carga el doble, una L cuatro veces y una XL ocho. Se usa en el costo estimado de las fichas.')}</dt><dd>${pp ? pesos(pp) : '—'}</dd></div>`;
+    };
+    f.addEventListener('input', () => { sucio = true; vista(); });
+    f.addEventListener('change', vista);
+    vista();
+    f.addEventListener('submit', (ev) => {
+      ev.preventDefault();
+      const d = leer();
+      if (d.hornos.some((x) => !(x.capacidadPuntos > 0))) { toast('La capacidad de cada horno debe ser mayor que cero.', 'error'); return; }
+      sucio = false;
+      enviar(guardarHorno(d), { alGuardar: avisoGuardado('Horno y trabajo'), alFallar: avisoError });
+    });
   };
   pintar();
   return alCambiar(pintar);

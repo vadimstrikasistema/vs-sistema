@@ -56,6 +56,8 @@ export const TIPOS_MOV = {
   conteo: 'Conteo físico',
   preparacion: 'Preparación de receta',
   compra: 'Compra',
+  produccion: 'Producción de piezas',
+  reciclaje: 'Arcilla reciclada',
   anulacion: 'Anulación'
 };
 

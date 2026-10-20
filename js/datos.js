@@ -13,6 +13,8 @@ export const estado = {
   listas: {},       // clave → { nombre, descripcion, items[] }
   insumos: {},      // id → insumo (incluye su stock y valor guardados)
   recetas: {},      // id → receta
+  piezas: {},       // id → ficha de pieza (con su stock de terminadas)
+  horno: null,      // config/horno: energía, precios, capacidad, valor hora
   proveedores: {},  // rut sin puntos → proveedor, con lo aprendido de sus facturas
   listo: false
 };
@@ -87,6 +89,12 @@ export function escuchar() {
     estado.insumos = m;
     avisar();
   }, errorEscucha));
+  desuscribir.push(onSnapshot(collection(db, 'piezas'), (qs) => {
+    const m = {};
+    qs.forEach((d) => { m[d.id] = { id: d.id, ...d.data() }; });
+    estado.piezas = m;
+    avisar();
+  }, errorEscucha));
   desuscribir.push(onSnapshot(collection(db, 'proveedores'), (qs) => {
     const m = {};
     qs.forEach((d) => { m[d.id] = { id: d.id, ...d.data() }; });
@@ -125,6 +133,10 @@ export function enviar(promesa, { alGuardar, alFallar } = {}) {
 // ---------- Guardado de configuración ----------
 export function guardarEmpresa(datos) {
   return setDoc(doc(db, 'config', 'empresa'), { ...datos, ...firma() }, { merge: true });
+}
+
+export function guardarHorno(datos) {
+  return setDoc(doc(db, 'config', 'horno'), { ...datos, ...firma() }, { merge: true });
 }
 
 export function guardarCosteo(datos) {
