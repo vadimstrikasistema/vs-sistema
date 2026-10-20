@@ -116,11 +116,13 @@ Estas decisiones se respetan en todas las fases:
 | `clientes` | uno por cliente | `tipo` (empresa o persona), `rut`, `rutLimpio`, `razonSocial`, `nombre` (del local), `giro`, `direccion`, `comuna`, `contacto`, `whatsapp`, `correo`, `instagram`, `condicionDias` (plazo de pago), `ultimoRecordatorio`, `notas`, `archivado` |
 | `facturas` | una por documento emitido (cuenta por cobrar) | `origen` (xml o manual), `tipoDoc` (33, 34, 61, 0 sin documento), `folio`, `fecha`, `mes`, `vencimiento`, cliente, `neto`, `iva`, `total`, `lineas`, `referencias`, `pagado`, `estado` (pendiente, parcial, pagada, anulada, nota-credito), `abierta`, `aplicadaA` en notas de crédito; `ordenIds` y `ordenNumeros` si viene de órdenes de venta |
 | `pagos` | uno por pago recibido | cliente, `fecha`, `medio`, `referencia`, `monto`, `aplicaciones[]` (factura y monto), `tipo` (pago o nota-credito), `anulado` |
-| `ventas` | una por venta directa | `fecha`, `mes`, `hora`, `canal`, `feriaId`, `medio`, cliente, `lineas[]` (pieza o sin ficha, `calidad`, cantidad, precio con IVA, `costoUnitario`), `descuento`, `total`, `neto`, `iva`, `comision`, `costo`, `boleta` (`emitida`, `folio`), `movs` (salidas de piezas), `anulado` |
+| `ventas` | una por venta directa | `fecha`, `mes`, `hora`, `canal`, `feriaId`, `medio`, cliente, `lineas[]` (pieza o sin ficha, `calidad`, cantidad, precio con IVA, `costoUnitario`), `descuento`, `total`, `neto`, `iva`, `comision`, `costo`, `boleta` (`emitida`, `folio`), `movs` (salidas de piezas), `pagos[]` y `encargoId` si viene de un encargo, `anulado` |
 | `ferias` | una por feria | `nombre`, `lugar`, `fechaInicio`, `fechaFin`, `costoPuesto`, `otrosCostos`, `notas`, `cerrada` |
 | `config` | `ventas` | `controlarStock`, `comisiones` por medio de pago, `recordarBoleta` |
-| `ordenes` | una por orden de venta a empresas | `numero` (correlativo), `fecha`, `mes`, cliente (`clienteId`, `razonSocial`, `rutCliente`, `rutLimpio`), `condicionDias`, `origen` (directa o consignacion), `consignacionId` y `consignacionNumero`, `lineas[]` (pieza, `calidad`, cantidad, precio neto, `subtotal`, `costoUnitario`), `neto`, `iva`, `total`, `costo`, `entregada`, `fechaEntrega`, `facturada`, `facturaId`, `folio`, `fechaFactura`, `nota`, `anulada` |
+| `ordenes` | una por orden de venta a empresas | `numero` (correlativo), `fecha`, `mes`, cliente (`clienteId`, `razonSocial`, `rutCliente`, `rutLimpio`), `condicionDias`, `origen` (directa o consignacion), `consignacionId` y `consignacionNumero`, `lineas[]` (pieza, `calidad`, cantidad, precio neto, `subtotal`, `costoUnitario`), `neto`, `iva`, `total`, `costo`, `entregada`, `fechaEntrega`, `fechaCompromiso`, `facturada`, `facturaId`, `folio`, `fechaFactura`, `nota`, `anulada` |
 | `consignaciones` | una por tienda con piezas en consignación | `numero`, `fecha`, cliente, `lineas[]` (`key`, pieza, `calidad`, precio neto, `costoUnitario`, `entregadas`, `vendidas`, `devueltas`, `perdidas`), `entregas[]`, `liquidaciones[]` (fecha, vendidas, vuelven, vuelven dañadas, perdidas y su costo, `ordenId`), `cerrada`, `nota`, `anulada` |
+| `encargos` | uno por encargo de un cliente | `numero`, `fecha`, `fechaEntrega`, `canal`, cliente, `lineas[]` (pieza o sin ficha, cantidad, precio con IVA), `total`, `nota`, `abonos[]` (`monto`, `medio`, `fecha`, `devuelto`), `estado` (pendiente, taller, listo, entregado, anulado), `historial[]`, `ventaId`, `fechaEntregado` |
+| `eventos` | uno por evento propio de la agenda | `titulo`, `tipo` (entrega, clase, quema, compra, reunion, otro), `lugar`, `fecha`, `fechaFin`, `hora`, `horaFin`, `nota`, `hecho`, `anulado` |
 | `alertasPrecio` | una por cambio de precio de 10 % o más | insumo, costo anterior y nuevo, variación, proveedor, documento, recetas afectadas, `visto` |
 
 Listas iniciales: tipos de insumo, unidades, categorías de pieza, canales de venta, medios de pago, áreas del negocio, ítems de gasto, motivos de merma y motivos de ajuste de inventario.
@@ -142,6 +144,8 @@ js/iconos.js            íconos
 js/app.js               ingreso, menú y navegación
 js/b2b-core.js          órdenes de venta, consignación y paso a factura
 js/favorito-sii.js      favorito que rellena el facturador gratuito del SII
+js/encargos-core.js     encargos con abono
+js/agenda-core.js       todo lo que tiene fecha, para la agenda
 js/modulos/             una pantalla por módulo
 fonts/, img/            tipografías y logo (incluidos para funcionar sin señal)
 ```
@@ -159,9 +163,20 @@ fonts/, img/            tipografías y logo (incluidos para funcionar sin señal
    - **3a** · clientes y cobranza: facturas emitidas desde el XML o a mano, notas de crédito, pagos en efectivo o transferencia, recordatorios por WhatsApp y estado de cuenta en PDF. ✔
    - **3b** · venta rápida pieza por pieza, también sin señal, con boleta y folio, cierre del día, ferias con su resultado, historial y análisis; vender sin inventario cargado hasta enero. ✔
    - **3c** · órdenes de venta con PDF por WhatsApp, consignaciones con liquidación y facturación con el favorito del facturador del SII, conectadas con la cobranza. ✔ Pendiente: confirmar los nombres de campo del facturador con el favorito que ya usa el taller, y guía de despacho para consignación si hace falta.
-4. **Agenda y clases** · calendario con quemas, ferias, clases, entregas y compromisos de pago.
+4. **Agenda y encargos**:
+   - **4a** · encargos con abono y agenda con eventos propios (clases, quemas, entregas), ferias, encargos, órdenes por entregar y vencimientos de cobro. ✔
+   - Siguen: gastos recurrentes y por pagar en la agenda, clases con alumnos, contactos de feria con QR, modo feria y conteo de piezas (enero).
 
 ## Historial de versiones
+
+### 0.8.0 · Entrega 4a: encargos y agenda
+- **Ventas → Encargos:** piezas a pedido (con ficha o sin ella) con precio con IVA, detalles, fecha de entrega y uno o varios abonos con su medio de pago. Estados: por empezar, en el taller, listo y entregado; aviso por WhatsApp cuando está listo, con el saldo y los datos de transferencia. Al entregar se cobra el saldo y se registra la venta completa, con cada abono como parte del pago, y las piezas salen del stock. Si se anula la venta, el encargo vuelve a «listo». Al anular un encargo se anota si se devolvió el abono.
+- **Ventas:** una venta pagada en partes muestra cada pago y el análisis la reparte por medio de pago.
+- **Agenda:** calendario del mes (con puntos de color en el celular), el día elegido y los próximos 14 días. Eventos propios (clase, quema, entrega, compra, reunión) con horario y varios días; marcar hecho o quitar. Aparecen solos las ferias, los encargos (los atrasados, hoy), las órdenes por entregar con su fecha y los vencimientos de las facturas por cobrar. Desde un día se agrega un evento, un encargo o una feria.
+- **Órdenes:** fecha de entrega comprometida cuando no se entrega al crearla.
+- **Inicio:** lo de esta semana.
+- **Reglas de Firestore nuevas** para encargos y eventos. **Hay que volver a publicarlas.**
+- Estructura de datos versión 8.
 
 ### 0.7.0 · Fase 3, entrega 3c: órdenes de venta, consignación y facturación
 - **Ventas → Órdenes:** orden de venta a tiendas y cafeterías con correlativo (OV 1, OV 2…), precio neto a tiendas y el último precio cobrado a cada cliente; se entrega al crearla o después (ahí salen las piezas del stock); PDF con datos de transferencia para mandar por WhatsApp; margen; anulación que devuelve las piezas.

@@ -8,8 +8,9 @@ import { CONDICIONES, nombreCliente, clientePorRut } from '../cobranza-core.js';
 import { ICONOS } from '../iconos.js';
 import { vistaVentaRapida, vistaHistorial, vistaFerias, vistaAnalisis } from './venta-rapida.js';
 import { vistaOrdenes, vistaConsignacion, vistaPorFacturar } from './ventas-b2b.js';
+import { vistaEncargos } from './encargos.js';
 
-const PEST = [['venta-rapida', 'Venta rápida'], ['historial', 'Historial'], ['ferias', 'Ferias'], ['analisis', 'Análisis'], ['ordenes', 'Órdenes'], ['consignacion', 'Consignación'], ['por-facturar', 'Por facturar'], ['clientes', 'Clientes']];
+const PEST = [['venta-rapida', 'Venta rápida'], ['encargos', 'Encargos'], ['historial', 'Historial'], ['ferias', 'Ferias'], ['analisis', 'Análisis'], ['ordenes', 'Órdenes'], ['consignacion', 'Consignación'], ['por-facturar', 'Por facturar'], ['clientes', 'Clientes']];
 const fallo = avisoError(toast);
 const norm = (t) => String(t || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
 
@@ -22,6 +23,7 @@ export default {
         <p class="pagina-bajada">${{
           clientes: 'Tiendas, cafeterías y profesionales a los que facturas, y clientes finales que quieres recordar.',
           'venta-rapida': 'Ventas en feria, en el taller o por Instagram, pieza por pieza. Funciona sin señal.',
+          encargos: 'Piezas a pedido, con su abono y la fecha de entrega.',
           historial: 'Todas las ventas directas, día por día.',
           ferias: 'Cada feria con sus fechas, costos y resultado.',
           analisis: 'Qué se vende, dónde, cómo se paga y a qué hora.',
@@ -38,6 +40,7 @@ export default {
     if (actual === 'historial') return vistaHistorial(c);
     if (actual === 'ferias') return vistaFerias(c);
     if (actual === 'analisis') return vistaAnalisis(c);
+    if (actual === 'encargos') return vistaEncargos(c);
     if (actual === 'ordenes') return vistaOrdenes(c);
     if (actual === 'consignacion') return vistaConsignacion(c);
     if (actual === 'por-facturar') return vistaPorFacturar(c);

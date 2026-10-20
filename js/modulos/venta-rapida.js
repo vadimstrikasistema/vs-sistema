@@ -267,7 +267,8 @@ async function detalleVenta(v) {
         <li><strong>Total</strong><strong>${pesos(v.total)}</strong></li></ul>
       <dl class="datos-fijos compacto">
         <div><dt>Dónde</dt><dd>${esc(etqCanal(v))}</dd></div>
-        <div><dt>Medio de pago</dt><dd>${esc(nombreItem('mediosPago', v.medio))}${v.comision ? ` · comisión ${pesos(v.comision)}` : ''}</dd></div>
+        <div><dt>Medio de pago</dt><dd>${v.pagos?.length > 1 ? v.pagos.map((x) => `${esc(nombreItem('mediosPago', x.medio))} ${pesos(x.monto)}${x.fecha !== v.fecha ? ` (${fechaCorta(x.fecha)})` : ''}`).join(' · ') : esc(nombreItem('mediosPago', v.medio))}${v.comision ? ` · comisión ${pesos(v.comision)}` : ''}</dd></div>
+        ${v.encargoId ? `<div><dt>Encargo</dt><dd>${esc(estado.encargos[v.encargoId] ? `Encargo ${estado.encargos[v.encargoId].numero}` : 'Encargo')}</dd></div>` : ''}
         ${v.clienteNombre ? `<div><dt>Cliente</dt><dd>${esc(v.clienteNombre)}</dd></div>` : ''}
         <div><dt>Boleta</dt><dd>${v.boleta?.emitida ? `Folio ${esc(v.boleta.folio || 'sin anotar')}` : 'Sin boleta'}</dd></div>
       </dl>
@@ -388,8 +389,8 @@ export function vistaFerias(el) {
   return alCambiar(pintar);
 }
 
-async function editarFeria(f = null) {
-  const d = f || { nombre: '', lugar: '', fechaInicio: hoyISO(), fechaFin: hoyISO(), costoPuesto: null, otrosCostos: null, notas: '' };
+export async function editarFeria(f = null, { fecha = hoyISO() } = {}) {
+  const d = f || { nombre: '', lugar: '', fechaInicio: fecha, fechaFin: fecha, costoPuesto: null, otrosCostos: null, notas: '' };
   await formulario({
     titulo: f ? f.nombre : 'Nueva feria', textoGuardar: f ? 'Guardar cambios' : 'Crear feria',
     cuerpo: `<div class="campos">
@@ -431,7 +432,7 @@ const columnasHora = (porHora) => {
     <div class="col-mes"><span class="col-valor">${v ? pesos(v) : ''}</span><span class="col-pista"><span class="col-barra" style="height:${v ? Math.max(3, v / max * 100) : 0}%"></span></span><span class="col-mes-etq">${h}h</span></div>`).join('')}</div>`;
 };
 
-async function detalleFeria(f) {
+export async function detalleFeria(f) {
   const vs = await documentosDonde('ventas', 'feriaId', '==', f.id).catch(() => []);
   const r = resumenVentas(vs);
   const gastos = (f.costoPuesto || 0) + (f.otrosCostos || 0);

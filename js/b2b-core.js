@@ -102,7 +102,7 @@ const limpiarLinea = (l) => ({
 });
 
 // lineas: [{ piezaId, nombre, calidad, cantidad, precio (neto) }]
-export function crearOrden(lote, { cliente, fecha, lineas, entregar = true, nota = '', origen = 'directa', consignacion = null }) {
+export function crearOrden(lote, { cliente, fecha, lineas, entregar = true, nota = '', origen = 'directa', consignacion = null, fechaCompromiso = null }) {
   const oRef = refNueva('ordenes');
   const numero = siguienteNumero('ordenes');
   const ref = { tipo: 'orden', id: oRef.id };
@@ -116,7 +116,7 @@ export function crearOrden(lote, { cliente, fecha, lineas, entregar = true, nota
     consignacionId: consignacion?.id || null, consignacionNumero: consignacion?.numero || null,
     lineas: lineasDoc, piezas: lineasDoc.reduce((s, l) => s + l.cantidad, 0), ...t,
     costo: Math.round(lineasDoc.reduce((s, l) => s + l.costoUnitario * l.cantidad, 0)),
-    entregada: Boolean(entregar), fechaEntrega: entregar ? fecha : null,
+    entregada: Boolean(entregar), fechaEntrega: entregar ? fecha : null, fechaCompromiso: entregar ? null : fechaCompromiso,
     facturada: false, facturaId: null, folio: '', nota, anulada: false, ...firma()
   };
   lote.set(oRef, datos);

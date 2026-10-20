@@ -27,12 +27,13 @@ let nk = 0;
 // ================================================================ Editor de piezas
 // Lista de piezas con cantidad y precio neto. `cliente()` da el cliente elegido
 // para proponer su último precio.
-function montarEditor(caja, ls, { cliente, conOtra = true, mostrarStock = true }) {
+// `precioDe(cliente, piezaId)` cambia el precio propuesto; `conIva`: los precios ya incluyen IVA (encargos).
+export function montarEditor(caja, ls, { cliente, conOtra = true, mostrarStock = true, precioDe = precioCliente, conIva = false }) {
   function pintar() {
     const t = totalesLineas(ls.filter((l) => l.cantidad > 0 && l.precio > 0));
     caja.innerHTML = `
       <div class="b2b-agregar">
-        <label class="campo"><span class="campo-etiqueta">Agregar pieza ${info('Elige la ficha. El precio que aparece es el último que le cobraste a este cliente por esa pieza o, si es la primera vez, el precio a tiendas de la ficha. Puedes cambiarlo.')}</span>
+        <label class="campo"><span class="campo-etiqueta">Agregar pieza ${info(conIva ? 'Elige la ficha, o «Otra pieza» para algo que no tiene ficha (un juego de platos a pedido, por ejemplo). El precio es el de venta al público, con IVA; puedes cambiarlo.' : 'Elige la ficha. El precio que aparece es el último que le cobraste a este cliente por esa pieza o, si es la primera vez, el precio a tiendas de la ficha. Puedes cambiarlo.')}</span>
           <select data-agregar><option value="">Elige una pieza…</option>${fichas().map((p) => `<option value="${esc(p.id)}">${esc(p.nombre)}${mostrarStock ? ` · ${numero(p.stock || 0, 0)} en stock${p.stockSegunda ? `, ${numero(p.stockSegunda, 0)} de 2ª` : ''}` : ''}</option>`).join('')}</select></label>
         ${conOtra ? '<button type="button" class="btn btn-suave" data-otra>Otra pieza</button>' : ''}
       </div>
@@ -42,18 +43,18 @@ function montarEditor(caja, ls, { cliente, conOtra = true, mostrarStock = true }
           <span class="b2b-datos">
             ${l.piezaId ? `<button type="button" class="vr-calidad ${l.calidad === 'segunda' ? 'segunda' : ''}" data-calidad title="Primera o segunda">${l.calidad === 'segunda' ? '2ª' : '1ª'}</button>` : '<span></span>'}
             <span class="con-sufijo b2b-cant"><input data-cant inputmode="numeric" value="${l.cantidad || ''}" aria-label="Cantidad"><span class="sufijo">u</span></span>
-            <span class="con-sufijo b2b-precio"><input data-precio inputmode="numeric" value="${l.precio ? numero(l.precio, 0) : ''}" aria-label="Precio neto"><span class="sufijo">$</span></span>
+            <span class="con-sufijo b2b-precio"><input data-precio inputmode="numeric" value="${l.precio ? numero(l.precio, 0) : ''}" aria-label="${conIva ? 'Precio con IVA' : 'Precio neto'}"><span class="sufijo">$</span></span>
             <span class="b2b-subtotal">${pesos((l.cantidad || 0) * (l.precio || 0))}</span>
             <button type="button" class="btn-icono" data-quitar aria-label="Quitar">✕</button>
           </span>
         </li>`).join('')}</ul>
         <div class="b2b-totales">
-          <span>Neto <strong>${pesos(t.neto)}</strong></span><span>IVA <strong>${pesos(t.iva)}</strong></span><span>Total <strong>${pesos(t.total)}</strong></span>
-        </div>` : '<p class="texto-suave">Todavía no hay piezas. Los precios son netos (sin IVA), como en la factura.</p>'}`;
+          ${conIva ? `<span>Total con IVA <strong>${pesos(ls.reduce((x, l) => x + (l.cantidad || 0) * (l.precio || 0), 0))}</strong></span>` : `<span>Neto <strong>${pesos(t.neto)}</strong></span><span>IVA <strong>${pesos(t.iva)}</strong></span><span>Total <strong>${pesos(t.total)}</strong></span>`}
+        </div>` : `<p class="texto-suave">Todavía no hay piezas. ${conIva ? 'Los precios incluyen IVA, como en la boleta.' : 'Los precios son netos (sin IVA), como en la factura.'}</p>`}`;
     $('[data-agregar]', caja).addEventListener('change', (e) => {
       const p = estado.piezas[e.target.value];
       if (!p) return;
-      ls.push({ key: `k${nk++}`, piezaId: p.id, nombre: p.nombre, calidad: 'primera', cantidad: 1, precio: precioCliente(cliente(), p.id), manual: false });
+      ls.push({ key: `k${nk++}`, piezaId: p.id, nombre: p.nombre, calidad: 'primera', cantidad: 1, precio: precioDe(cliente(), p.id), manual: false });
       pintar();
     });
     $('[data-otra]', caja)?.addEventListener('click', () => { ls.push({ key: `k${nk++}`, piezaId: null, nombre: '', calidad: 'primera', cantidad: 1, precio: 0, manual: true }); pintar(); $$('[data-nombre]', caja).pop()?.focus(); });
@@ -70,16 +71,16 @@ function montarEditor(caja, ls, { cliente, conOtra = true, mostrarStock = true }
   return {
     pintar,
     // Al cambiar de cliente se proponen sus precios (salvo los que se escribieron a mano).
-    recalcular() { ls.forEach((l) => { if (l.piezaId && !l.manual) l.precio = precioCliente(cliente(), l.piezaId); }); pintar(); }
+    recalcular() { ls.forEach((l) => { if (l.piezaId && !l.manual) l.precio = precioDe(cliente(), l.piezaId); }); pintar(); }
   };
 }
 
-function validarLineas(ls) {
+export function validarLineas(ls) {
   if (!ls.length) return 'Agrega al menos una pieza.';
   for (const l of ls) {
     if (!l.nombre.trim()) return 'Hay una pieza sin nombre.';
     if (!(l.cantidad > 0)) return `Revisa la cantidad de «${l.nombre}».`;
-    if (!(l.precio > 0)) return `Escribe el precio neto de «${l.nombre}».`;
+    if (!(l.precio > 0)) return `Escribe el precio de «${l.nombre}».`;
   }
   return null;
 }
@@ -173,10 +174,12 @@ export async function nuevaOrden({ clienteId = '' } = {}) {
       </div>
       <div data-editor></div>
       <label class="interruptor"><input type="checkbox" name="entregar" checked><span>Se entrega ahora ${info('Las piezas salen del stock al entregarlas. Si la tienda pidió y todavía no se las llevas, desmárcalo: la orden queda «Por entregar» y la marcas cuando las entregues.')}</span></label>
+      <label class="campo" data-compromiso hidden><span class="campo-etiqueta">Fecha de entrega ${info('Cuándo te comprometiste a llevar las piezas. Aparece en la Agenda.')}</span><input type="date" name="fechaCompromiso" min="${hoyISO()}"></label>
       <label class="campo campo-ancho"><span class="campo-etiqueta">Nota</span><input name="nota" maxlength="200" placeholder="Ej.: pedido para la vitrina de diciembre"></label>`,
     montar(dlg, form) {
       ed = montarEditor($('[data-editor]', dlg), ls, { cliente: () => estado.clientes[form.cliente.value] });
       conectarCliente(dlg, form, () => ed.recalcular());
+      form.entregar.addEventListener('change', () => { $('[data-compromiso]', dlg).hidden = form.entregar.checked; });
     },
     guardar(form) {
       const cliente = estado.clientes[form.cliente.value];
@@ -185,7 +188,7 @@ export async function nuevaOrden({ clienteId = '' } = {}) {
       if (err) return err;
       if (form.entregar.checked) { const f = faltaStock(ls); if (f) return f; }
       const lote = nuevoLote();
-      creada = crearOrden(lote, { cliente, fecha: form.fecha.value || hoyISO(), lineas: ls, entregar: form.entregar.checked, nota: form.nota.value.trim() });
+      creada = crearOrden(lote, { cliente, fecha: form.fecha.value || hoyISO(), lineas: ls, entregar: form.entregar.checked, nota: form.nota.value.trim(), fechaCompromiso: form.entregar.checked ? null : form.fechaCompromiso.value || null });
       enviar(lote.commit(), { alGuardar: avisoGuardado(toast, `${etiquetaOV(creada)} creada: ${pesos(creada.total)}`), alFallar: fallo });
       return null;
     }
@@ -225,6 +228,7 @@ export async function detalleOrden(o0, { recienCreada = false } = {}) {
         <div><dt>Fecha</dt><dd>${fechaCorta(o.fecha)}</dd></div>
         <div><dt>Estado</dt><dd>${etiquetaEstado(o)}</dd></div>
         ${o.entregada && o.fechaEntrega ? `<div><dt>Entregada</dt><dd>${fechaCorta(o.fechaEntrega)}</dd></div>` : ''}
+        ${!o.entregada && o.fechaCompromiso ? `<div><dt>Entregar el</dt><dd>${fechaCorta(o.fechaCompromiso)}</dd></div>` : ''}
         ${o.consignacionNumero ? `<div><dt>Origen</dt><dd>Vendido en ${esc(etiquetaConsignacion({ numero: o.consignacionNumero }).toLowerCase())}</dd></div>` : ''}
         ${o.facturada ? `<div><dt>Factura</dt><dd>Folio ${esc(o.folio)} · ${fechaCorta(o.fechaFactura)}</dd></div>` : ''}
         ${o.nota ? `<div><dt>Nota</dt><dd>${esc(o.nota)}</dd></div>` : ''}

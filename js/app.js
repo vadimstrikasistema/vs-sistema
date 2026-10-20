@@ -9,10 +9,7 @@ const raiz = document.getElementById('app');
 // ---------------------------------------------------------------- Módulos
 const MODULOS = [
   { clave: 'inicio', titulo: 'Inicio', carga: () => import('./modulos/inicio.js') },
-  { clave: 'agenda', titulo: 'Agenda', pendiente: {
-    fase: 4, resumen: 'Todo lo que tiene fecha en el taller, en un solo calendario.',
-    puntos: ['Quemas programadas y qué lotes llevan', 'Ferias con días, horario y costo del puesto', 'Clases y talleres con sus sesiones', 'Entregas de encargos y compromisos de pago', 'Copia opcional a Google Calendar']
-  } },
+  { clave: 'agenda', titulo: 'Agenda', carga: () => import('./modulos/agenda.js') },
   { clave: 'ventas', titulo: 'Ventas', carga: () => import('./modulos/ventas.js') },
   { clave: 'cobranza', titulo: 'Cobranza', carga: () => import('./modulos/cobranza.js') },
   { clave: 'produccion', titulo: 'Producción', carga: () => import('./modulos/produccion.js') },

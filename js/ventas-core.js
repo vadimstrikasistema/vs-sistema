@@ -40,7 +40,9 @@ export function totalesCarrito(lineas, medio, descuentoGlobal = 0) {
 
 // Registra una venta. Si la línea tiene ficha, descuenta la pieza del stock
 // (aunque quede negativo cuando el control de stock está apagado).
-export function registrarVenta(lote, { lineas, medio, canal, feriaId = null, cliente = null, fecha, hora, boleta, nota = '', descuento = 0 }) {
+// `pagos` (opcional): cuando la venta se pagó en partes, como un encargo con abono:
+// [{ medio, monto, fecha }]. La comisión se calcula por cada parte.
+export function registrarVenta(lote, { lineas, medio, canal, feriaId = null, cliente = null, fecha, hora, boleta, nota = '', descuento = 0, pagos = null, encargoId = null }) {
   const vRef = refNueva('ventas');
   const ref = { tipo: 'venta', id: vRef.id };
   const t = totalesCarrito(lineas, medio, descuento);
@@ -62,6 +64,8 @@ export function registrarVenta(lote, { lineas, medio, canal, feriaId = null, cli
     clienteId: cliente?.id || null, clienteNombre: cliente?.nombre || '',
     lineas: lineasDoc, piezas: lineasDoc.reduce((s, l) => s + l.cantidad, 0),
     ...t, costo, comisionPct: comisionDe(medio),
+    ...(pagos ? { pagos, comision: pagos.reduce((x, p) => x + Math.round(p.monto * comisionDe(p.medio) / 100), 0) } : {}),
+    ...(encargoId ? { encargoId } : {}),
     boleta: { emitida: Boolean(boleta?.emitida), folio: boleta?.folio || '' },
     nota, movs, anulado: false, ...firma()
   };
@@ -76,6 +80,9 @@ export function anularVenta(lote, v, motivo = '') {
     }
   });
   lote.update(refDoc('ventas', v.id), { anulado: true, motivoAnulacion: motivo, anuladoEn: Date.now(), ...firma() });
+  // Si venía de un encargo, el encargo vuelve a «listo para entregar» (sus abonos siguen ahí).
+  const e = v.encargoId && estado.encargos?.[v.encargoId];
+  if (e) lote.update(refDoc('encargos', e.id), { estado: 'listo', ventaId: null, fechaEntregado: null, historial: [...(e.historial || []), { fecha: v.fecha, estado: 'listo' }], ...firma() });
 }
 
 export function marcarBoleta(lote, v, folio) {
@@ -88,7 +95,8 @@ export function resumenVentas(ventas) {
   const suma = (k) => vs.reduce((s, v) => s + (v[k] || 0), 0);
   const porMedio = new Map(); const porCanal = new Map(); const porPieza = new Map(); const porHora = new Map(); const porDia = new Map();
   vs.forEach((v) => {
-    porMedio.set(v.medio, (porMedio.get(v.medio) || 0) + v.total);
+    if (v.pagos?.length) v.pagos.forEach((p) => porMedio.set(p.medio, (porMedio.get(p.medio) || 0) + p.monto));
+    else porMedio.set(v.medio, (porMedio.get(v.medio) || 0) + v.total);
     porCanal.set(v.canal, (porCanal.get(v.canal) || 0) + v.total);
     porDia.set(v.fecha, (porDia.get(v.fecha) || 0) + v.total);
     const h = (v.hora || '00:00').slice(0, 2);

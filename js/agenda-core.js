@@ -1,0 +1,86 @@
+// Agenda: junta en un calendario todo lo que tiene fecha en el taller.
+// Los eventos propios (entregas, clases, quemas…) viven en `eventos`; el resto
+// se lee de donde ya está: ferias, encargos, órdenes por entregar y facturas
+// por cobrar. Así nada se anota dos veces.
+import { estado, firma } from './datos.js';
+import { refNueva, refDoc } from './stock.js';
+import { hoyISO, pesos } from './ui.js';
+import { saldo } from './cobranza-core.js';
+import { encargoActivo, saldoEncargo, resumenEncargo } from './encargos-core.js';
+
+export const TIPOS_EVENTO = {
+  entrega: { nombre: 'Entrega', clase: 'ag-entrega' },
+  clase: { nombre: 'Clase o taller', clase: 'ag-clase' },
+  quema: { nombre: 'Quema', clase: 'ag-quema' },
+  compra: { nombre: 'Compra o retiro', clase: 'ag-otro' },
+  reunion: { nombre: 'Reunión', clase: 'ag-otro' },
+  otro: { nombre: 'Otro', clase: 'ag-otro' }
+};
+// Colores de lo que viene de otros módulos.
+export const CLASE_ORIGEN = { feria: 'ag-feria', encargo: 'ag-entrega', orden: 'ag-entrega', cobro: 'ag-cobro' };
+
+// ---------------------------------------------------------------- Fechas
+export const aISO = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+export const deISO = (iso) => { const [y, m, d] = iso.split('-').map(Number); return new Date(y, m - 1, d); };
+export const sumar = (iso, dias) => { const d = deISO(iso); d.setDate(d.getDate() + dias); return aISO(d); };
+export const diasEntreISO = (a, b) => Math.round((deISO(b) - deISO(a)) / 86400000);
+
+// Semanas (lunes a domingo) que cubren el mes de `iso`.
+export function semanasDelMes(iso) {
+  const d = deISO(iso);
+  const primero = new Date(d.getFullYear(), d.getMonth(), 1);
+  const inicio = new Date(primero);
+  inicio.setDate(1 - ((primero.getDay() + 6) % 7));
+  const semanas = [];
+  const c = new Date(inicio);
+  do {
+    const s = [];
+    for (let i = 0; i < 7; i++) { s.push(aISO(c)); c.setDate(c.getDate() + 1); }
+    semanas.push(s);
+  } while (c.getMonth() === d.getMonth());
+  return semanas;
+}
+
+// ---------------------------------------------------------------- Eventos propios
+export function guardarEvento(lote, ev, datos) {
+  if (ev?.id) { lote.update(refDoc('eventos', ev.id), { ...datos, ...firma() }); return ev.id; }
+  const ref = refNueva('eventos');
+  lote.set(ref, { ...datos, hecho: false, anulado: false, creadoMs: Date.now(), ...firma() });
+  return ref.id;
+}
+export const marcarHecho = (lote, ev, hecho) => lote.update(refDoc('eventos', ev.id), { hecho, ...firma() });
+export const anularEvento = (lote, ev) => lote.update(refDoc('eventos', ev.id), { anulado: true, anuladoEn: Date.now(), ...firma() });
+
+// ---------------------------------------------------------------- Todo lo que tiene fecha
+// Devuelve [{ fecha, hora, titulo, sub, clase, origen, id, hecho, alerta }] entre `desde` y `hasta` (incluidos).
+export function itemsAgenda(desde, hasta, { facturas = [], hoy = hoyISO() } = {}) {
+  const r = [];
+  const dentro = (f) => f && f >= desde && f <= hasta;
+  Object.values(estado.eventos).filter((e) => !e.anulado).forEach((e) => {
+    const fin = e.fechaFin && e.fechaFin > e.fecha ? e.fechaFin : e.fecha;
+    for (let f = e.fecha; f <= fin; f = sumar(f, 1)) {
+      if (!dentro(f)) continue;
+      r.push({ fecha: f, hora: e.hora ? `${e.hora}${e.horaFin ? `–${e.horaFin}` : ''}` : '', titulo: e.titulo, sub: [TIPOS_EVENTO[e.tipo]?.nombre, e.lugar].filter(Boolean).join(' · '), clase: TIPOS_EVENTO[e.tipo]?.clase || 'ag-otro', origen: 'evento', id: e.id, hecho: Boolean(e.hecho), alerta: !e.hecho && f < hoy && e.tipo === 'entrega' });
+    }
+  });
+  Object.values(estado.ferias).forEach((x) => {
+    const fin = x.fechaFin || x.fechaInicio;
+    for (let f = x.fechaInicio; f && f <= fin; f = sumar(f, 1)) {
+      if (dentro(f)) r.push({ fecha: f, hora: '', titulo: x.nombre, sub: ['Feria', x.lugar].filter(Boolean).join(' · '), clase: CLASE_ORIGEN.feria, origen: 'feria', id: x.id, hecho: f < hoy });
+    }
+  });
+  Object.values(estado.encargos).filter(encargoActivo).forEach((e) => {
+    // Un encargo atrasado se muestra hoy, para que no se pierda en el pasado.
+    const f = e.fechaEntrega < hoy ? hoy : e.fechaEntrega;
+    if (!dentro(f)) return;
+    r.push({ fecha: f, hora: '', titulo: `Entregar encargo · ${e.clienteNombre}`, sub: `${resumenEncargo(e)}${saldoEncargo(e) ? ` · saldo ${pesos(saldoEncargo(e))}` : ''}`, clase: CLASE_ORIGEN.encargo, origen: 'encargo', id: e.id, alerta: e.fechaEntrega < hoy });
+  });
+  Object.values(estado.ordenes).filter((o) => !o.anulada && !o.entregada && o.fechaCompromiso).forEach((o) => {
+    const f = o.fechaCompromiso < hoy ? hoy : o.fechaCompromiso;
+    if (dentro(f)) r.push({ fecha: f, hora: '', titulo: `Entregar OV ${o.numero} · ${o.clienteNombre}`, sub: `${o.piezas} pieza${o.piezas === 1 ? '' : 's'}`, clase: CLASE_ORIGEN.orden, origen: 'orden', id: o.id, alerta: o.fechaCompromiso < hoy });
+  });
+  facturas.filter((f) => f.abierta && !f.anulada && f.vencimiento && saldo(f) > 0).forEach((f) => {
+    if (dentro(f.vencimiento)) r.push({ fecha: f.vencimiento, hora: '', titulo: `Vence factura ${f.folio || ''} · ${f.clienteNombre}`, sub: `Por cobrar ${pesos(saldo(f))}`, clase: CLASE_ORIGEN.cobro, origen: 'cobro', id: f.id, alerta: f.vencimiento < hoy });
+  });
+  return r.sort((a, b) => a.fecha.localeCompare(b.fecha) || (a.hora || '99').localeCompare(b.hora || '99') || a.titulo.localeCompare(b.titulo, 'es'));
+}

@@ -20,6 +20,8 @@ export const estado = {
   ventas: null,     // config/ventas: control de stock, comisiones
   ordenes: {},      // id → orden de venta a empresas
   consignaciones: {}, // id → entrega en consignación
+  encargos: {},     // id → encargo de un cliente, con sus abonos
+  eventos: {},      // id → evento de la agenda (entregas, clases, quemas…)
   proveedores: {},  // rut sin puntos → proveedor, con lo aprendido de sus facturas
   listo: false
 };
@@ -118,8 +120,8 @@ export function escuchar() {
     estado.proveedores = m;
     avisar();
   }, errorEscucha));
-  // Órdenes y consignaciones: son decenas al año, se escuchan completas.
-  for (const col of ['ordenes', 'consignaciones']) {
+  // Órdenes, consignaciones, encargos y eventos: son decenas al año, se escuchan completos.
+  for (const col of ['ordenes', 'consignaciones', 'encargos', 'eventos']) {
     desuscribir.push(onSnapshot(collection(db, col), (qs) => {
       const m = {};
       qs.forEach((d) => { m[d.id] = { id: d.id, ...d.data() }; });
