@@ -4,7 +4,7 @@ import {
   db, auth, collection, doc, getDoc, onSnapshot, setDoc, writeBatch, serverTimestamp
 } from './firebase.js';
 import { SCHEMA_VERSION, APP_VERSION } from './config.js';
-import { LISTAS_INICIALES, EMPRESA_INICIAL, COSTEO_INICIAL, slug } from './datos-iniciales.js';
+import { LISTAS_INICIALES, EMPRESA_INICIAL, COSTEO_INICIAL, TIPOS_EVENTO_INICIALES, slug } from './datos-iniciales.js';
 
 export const estado = {
   empresa: null,
@@ -22,6 +22,7 @@ export const estado = {
   consignaciones: {}, // id → entrega en consignación
   encargos: {},     // id → encargo de un cliente, con sus abonos
   eventos: {},      // id → evento de la agenda (entregas, clases, quemas…)
+  cursos: {},       // id → curso o taller, con sesiones, alumnos y materiales
   recurrentes: {},  // id → gasto que se repite (luz, arriendo…), con sus períodos registrados
   proveedores: {},  // rut sin puntos → proveedor, con lo aprendido de sus facturas
   listo: false
@@ -57,6 +58,18 @@ export async function prepararBase() {
     const datos = snap.data();
     // Actualización de estructura: cada versión solo agrega, nunca borra.
     if ((datos.schemaVersion ?? 1) < SCHEMA_VERSION) {
+      // Listas nuevas de esta versión y el canal fijo «Clases».
+      if ((datos.schemaVersion ?? 1) < 10) {
+        const b = writeBatch(db);
+        const te = await getDoc(doc(db, 'listas', 'tiposEvento'));
+        if (!te.exists()) b.set(doc(db, 'listas', 'tiposEvento'), { ...TIPOS_EVENTO_INICIALES, orden: 7.5, ...firma() });
+        const cv = await getDoc(doc(db, 'listas', 'canalesVenta'));
+        const items = cv.exists() ? cv.data().items || [] : [];
+        if (cv.exists() && !items.some((i) => i.id === 'clases')) {
+          b.set(doc(db, 'listas', 'canalesVenta'), { items: [...items, { id: 'clases', nombre: 'Clases', activo: true, orden: items.reduce((m, i) => Math.max(m, i.orden), -1) + 1, fijo: true }], ...firma() }, { merge: true });
+        }
+        await b.commit();
+      }
       await setDoc(ref, { schemaVersion: SCHEMA_VERSION, migradoConApp: APP_VERSION, ...firma() }, { merge: true });
       datos.schemaVersion = SCHEMA_VERSION;
     }
@@ -122,7 +135,7 @@ export function escuchar() {
     avisar();
   }, errorEscucha));
   // Órdenes, consignaciones, encargos y eventos: son decenas al año, se escuchan completos.
-  for (const col of ['ordenes', 'consignaciones', 'encargos', 'eventos', 'recurrentes']) {
+  for (const col of ['ordenes', 'consignaciones', 'encargos', 'eventos', 'recurrentes', 'cursos']) {
     desuscribir.push(onSnapshot(collection(db, col), (qs) => {
       const m = {};
       qs.forEach((d) => { m[d.id] = { id: d.id, ...d.data() }; });
@@ -216,7 +229,12 @@ export function agregarItem(clave, nombre) {
   let n = 2;
   while (ids.has(id)) id = `${slug(nombre)}-${n++}`;
   const orden = items.reduce((m, i) => Math.max(m, i.orden), -1) + 1;
-  items.push({ id, nombre: nombre.trim(), activo: true, orden });
+  items.push({ id, nombre: nombre.trim(), activo: true, orden, ...(clave === 'tiposEvento' ? { color: 'gris' } : {}) });
+  return guardarItems(clave, items);
+}
+
+export function cambiarColor(clave, id, color) {
+  const items = estado.listas[clave].items.map((i) => (i.id === id ? { ...i, color } : i));
   return guardarItems(clave, items);
 }
 

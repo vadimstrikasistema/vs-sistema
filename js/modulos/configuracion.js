@@ -1,8 +1,9 @@
 // Configuración: datos de la empresa, costeo, listas editables y sistema.
 import {
   estado, alCambiar, enviar, guardarEmpresa, guardarCosteo, guardarHorno, guardarVentas, itemsActivos,
-  validarNombre, agregarItem, renombrarItem, cambiarVisibilidad, moverItem
+  validarNombre, agregarItem, renombrarItem, cambiarVisibilidad, moverItem, cambiarColor
 } from '../datos.js';
+import { COLORES_AGENDA } from '../datos-iniciales.js';
 import { auth } from '../firebase.js';
 import { APP_VERSION, SCHEMA_VERSION, CORREOS_PERMITIDOS } from '../config.js';
 import { esc, info, toast, dialogo, $, $$, rutValido, formatearRut, leerNumero, numero, pesos } from '../ui.js';
@@ -371,6 +372,7 @@ function listas(el) {
               <span class="item-acciones">
                 <button class="btn-icono" data-accion="subir" data-clave="${clave}" data-id="${esc(i.id)}" aria-label="Subir ${esc(i.nombre)}" ${n === 0 ? 'disabled' : ''}>${ICONOS.arriba}</button>
                 <button class="btn-icono" data-accion="bajar" data-clave="${clave}" data-id="${esc(i.id)}" aria-label="Bajar ${esc(i.nombre)}" ${n === visibles.length - 1 ? 'disabled' : ''}>${ICONOS.abajo}</button>
+                ${clave === 'tiposEvento' ? `<button class="btn-icono" data-accion="color" data-clave="${clave}" data-id="${esc(i.id)}" aria-label="Color de ${esc(i.nombre)}" title="Color en el calendario"><span class="color-muestra ag-c-${esc(i.color || 'gris')}"></span></button>` : ''}
                 <button class="btn-icono" data-accion="renombrar" data-clave="${clave}" data-id="${esc(i.id)}" aria-label="Renombrar ${esc(i.nombre)}">${ICONOS.lapiz}</button>
                 ${i.fijo
                   ? `<span class="btn-icono deshabilitado" title="Ítem fijo: el sistema lo necesita">${ICONOS.candado}</span>`
@@ -395,6 +397,15 @@ function listas(el) {
         alGuardar: () => toast(a === 'ocultar' ? `«${item.nombre}» oculto. Puedes volver a mostrarlo cuando quieras.` : `«${item.nombre}» visible de nuevo.`),
         alFallar: avisoError
       });
+    } else if (a === 'color') {
+      const r = await dialogo({
+        titulo: `Color de «${item.nombre}»`,
+        cuerpo: `<div class="colores">${Object.entries(COLORES_AGENDA).map(([k, n]) => `<label class="color-opcion"><input type="radio" name="color" value="${k}" ${k === (item.color || 'gris') ? 'checked' : ''}><span class="color-muestra ag-c-${k}"></span><span>${n}</span></label>`).join('')}</div>
+                 <p class="texto-suave">Así se ven los eventos de este tipo en el calendario.</p>`,
+        botones: [{ texto: 'Cancelar', valor: false }, { texto: 'Guardar color', valor: true }]
+      });
+      if (!r?.valor || !r.datos.color) return;
+      enviar(cambiarColor(clave, id, r.datos.color), { alGuardar: () => toast('Color actualizado.'), alFallar: avisoError });
     } else if (a === 'renombrar') {
       const r = await dialogo({
         titulo: 'Renombrar',

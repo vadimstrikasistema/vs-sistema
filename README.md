@@ -116,7 +116,7 @@ Estas decisiones se respetan en todas las fases:
 | `clientes` | uno por cliente | `tipo` (empresa o persona), `rut`, `rutLimpio`, `razonSocial`, `nombre` (del local), `giro`, `direccion`, `comuna`, `contacto`, `whatsapp`, `correo`, `instagram`, `condicionDias` (plazo de pago), `ultimoRecordatorio`, `notas`, `archivado` |
 | `facturas` | una por documento emitido (cuenta por cobrar) | `origen` (xml o manual), `tipoDoc` (33, 34, 61, 0 sin documento), `folio`, `fecha`, `mes`, `vencimiento`, cliente, `neto`, `iva`, `total`, `lineas`, `referencias`, `pagado`, `estado` (pendiente, parcial, pagada, anulada, nota-credito), `abierta`, `aplicadaA` en notas de crédito; `ordenIds` y `ordenNumeros` si viene de órdenes de venta |
 | `pagos` | uno por pago recibido | cliente, `fecha`, `medio`, `referencia`, `monto`, `aplicaciones[]` (factura y monto), `tipo` (pago o nota-credito), `anulado` |
-| `ventas` | una por venta directa | `fecha`, `mes`, `hora`, `canal`, `feriaId`, `medio`, cliente, `lineas[]` (pieza o sin ficha, `calidad`, cantidad, precio con IVA, `costoUnitario`), `descuento`, `total`, `neto`, `iva`, `comision`, `costo`, `boleta` (`emitida`, `folio`), `movs` (salidas de piezas), `pagos[]` y `encargoId` si viene de un encargo, `anulado` |
+| `ventas` | una por venta directa | `fecha`, `mes`, `hora`, `canal`, `feriaId`, `medio`, cliente, `lineas[]` (pieza o sin ficha, `calidad`, cantidad, precio con IVA, `costoUnitario`), `descuento`, `total`, `neto`, `iva`, `comision`, `costo`, `boleta` (`emitida`, `folio`), `movs` (salidas de piezas), `pagos[]` y `encargoId` si viene de un encargo, `cursoId` si es el pago de una clase, `anulado` |
 | `ferias` | una por feria | `nombre`, `lugar`, `fechaInicio`, `fechaFin`, `costoPuesto`, `otrosCostos`, `notas`, `cerrada` |
 | `config` | `ventas` | `controlarStock`, `comisiones` por medio de pago, `recordarBoleta` |
 | `ordenes` | una por orden de venta a empresas | `numero` (correlativo), `fecha`, `mes`, cliente (`clienteId`, `razonSocial`, `rutCliente`, `rutLimpio`), `condicionDias`, `origen` (directa o consignacion), `consignacionId` y `consignacionNumero`, `lineas[]` (pieza, `calidad`, cantidad, precio neto, `subtotal`, `costoUnitario`), `neto`, `iva`, `total`, `costo`, `entregada`, `fechaEntrega`, `fechaCompromiso`, `facturada`, `facturaId`, `folio`, `fechaFactura`, `nota`, `anulada` |
@@ -124,6 +124,7 @@ Estas decisiones se respetan en todas las fases:
 | `encargos` | uno por encargo de un cliente | `numero`, `fecha`, `fechaEntrega`, `canal`, cliente, `lineas[]` (pieza o sin ficha, cantidad, precio con IVA), `total`, `nota`, `abonos[]` (`monto`, `medio`, `fecha`, `devuelto`), `estado` (pendiente, taller, listo, entregado, anulado), `historial[]`, `ventaId`, `fechaEntregado` |
 | `eventos` | uno por evento propio de la agenda | `titulo`, `tipo` (entrega, clase, quema, compra, reunion, otro), `lugar`, `fecha`, `fechaFin`, `hora`, `horaFin`, `nota`, `hecho`, `anulado` |
 | `recurrentes` | una por cuenta que se repite | `nombre`, `proveedor`, `rutProveedor`, `rutLimpio`, `tipoDoc`, `itemGasto`, `area`, `frecuencia` (meses: 1, 2, 3, 6, 12), `dia` de vencimiento, `inicio` (primer mes), `montoEstimado`, `medio`, `nota`, `registros` (por mes `YYYY-MM`: `gastoId`, `total`, `estado` pagado o por-pagar), `creadoMes`, `activo` |
+| `cursos` | uno por curso o taller | `numero`, `nombre`, `tipo` (ciclo o taller), `precio` por alumno, `cupos`, `lugar`, `descripcion`, `sesiones[]` (`key`, `fecha`, `hora`, `horaFin`, `tema`, `hecha`, `cancelada`, `asistencia`), `alumnos[]` (`key`, `clienteId`, `nombre`, `whatsapp`, `precio` especial, `pagos[]` con `ventaId`, `retirado`), `materiales[]` (insumo, cantidad, costo, movimiento), `otrosCostos`, `estado` (abierto o terminado), `anulado` |
 | `alertasPrecio` | una por cambio de precio de 10 % o más | insumo, costo anterior y nuevo, variación, proveedor, documento, recetas afectadas, `visto` |
 
 Listas iniciales: tipos de insumo, unidades, categorías de pieza, canales de venta, medios de pago, áreas del negocio, ítems de gasto, motivos de merma y motivos de ajuste de inventario.
@@ -148,6 +149,7 @@ js/favorito-sii.js      favorito que rellena el facturador gratuito del SII
 js/encargos-core.js     encargos con abono
 js/agenda-core.js       todo lo que tiene fecha, para la agenda
 js/recurrentes-core.js  cuentas que se repiten y el registro de cada mes
+js/clases-core.js       cursos, sesiones, alumnos, pagos y materiales
 js/modulos/             una pantalla por módulo
 fonts/, img/            tipografías y logo (incluidos para funcionar sin señal)
 ```
@@ -168,9 +170,19 @@ fonts/, img/            tipografías y logo (incluidos para funcionar sin señal
 4. **Agenda y encargos**:
    - **4a** · encargos con abono y agenda con eventos propios (clases, quemas, entregas), ferias, encargos, órdenes por entregar y vencimientos de cobro. ✔
    - **4b** · cuentas recurrentes (luz, arriendo, internet, contador) y gastos por pagar en la agenda. ✔
-   - Siguen: clases con alumnos, contactos de feria con QR, modo feria y conteo de piezas (enero).
+   - **4c** · clases y talleres, modo feria, tipos de evento editables con color. ✔
+   - Por confirmar: contactos de feria con QR, conteo de piezas (enero), rol de ayudante, fotos de piezas.
 
 ## Historial de versiones
+
+### 1.0.0 · Entrega 4c: clases, modo feria y tipos de evento
+- **Clases** (menú nuevo): cursos de varias sesiones o talleres de un día, con precio por alumno, cupos y sesiones semanales que aparecen en la Agenda. Alumnos (clientes finales) con precio especial si hace falta; cada pago queda como venta del canal fijo «Clases», con medio de pago y boleta, y se anula junto con su venta. Sesiones con tema, asistencia y recordatorio por WhatsApp con el saldo. Materiales que salen de bodega a costo promedio, otros costos y el resultado del curso.
+- **Modo feria** (#/feria): pantalla completa sin menú, botones grandes, filtros por categoría, carrito que sobrevive si se cierra la app, medio de pago y boleta en una hoja, confirmación grande con «Deshacer» y el total del día de la feria. Se abre desde Venta rápida, desde Inicio cuando hay feria hoy, o manteniendo presionado el ícono de la app en Android.
+- **Agenda:** tocar el número de un día abre «Agregar» (en el celular, el segundo toque). Desde ahí también se crea una clase.
+- **Configuración → Listas:** los tipos de evento de la agenda se editan como las demás listas y cada uno tiene su color.
+- La actualización agrega la lista de tipos de evento y el canal «Clases» a una base existente.
+- **Reglas de Firestore nuevas** para cursos. **Hay que volver a publicarlas.**
+- Estructura de datos versión 10.
 
 ### 0.9.0 · Entrega 4b: cuentas recurrentes y pagos en la agenda
 - **Gastos → Recurrentes:** cuentas que se repiten (mensual, cada 2, 3 o 6 meses, anual) con proveedor, RUT, documento que llega, ítem, área, día de vencimiento y monto aproximado. Cada mes muestra si está al día, por vencer o atrasada, y cuánto se estima y se registró en el mes.

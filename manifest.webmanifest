@@ -39,5 +39,29 @@
       "type": "image/svg+xml",
       "purpose": "any"
     }
+  ],
+  "shortcuts": [
+    {
+      "name": "Modo feria",
+      "short_name": "Feria",
+      "description": "Vender rápido en la feria",
+      "url": "./#/feria",
+      "icons": [
+        {
+          "src": "img/icono-192.png",
+          "sizes": "192x192"
+        }
+      ]
+    },
+    {
+      "name": "Agenda",
+      "url": "./#/agenda",
+      "icons": [
+        {
+          "src": "img/icono-192.png",
+          "sizes": "192x192"
+        }
+      ]
+    }
   ]
 }

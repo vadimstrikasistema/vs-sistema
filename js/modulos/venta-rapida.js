@@ -40,6 +40,7 @@ export function vistaVentaRapida(el) {
       <label class="campo"><span class="campo-etiqueta">Dónde vendes</span><select data-canal>${opcionesLista('canalesVenta', ctx.canal)}</select></label>
       <label class="campo" data-con-feria><span class="campo-etiqueta">Feria ${info('Las ventas quedan asociadas a la feria para ver su resultado: ventas por día y por hora, costo del puesto y ganancia. Crea las ferias en la pestaña Ferias.')}</span><select data-feria></select></label>
       <label class="campo"><span class="campo-etiqueta">Fecha ${info('Hoy, por defecto. Cámbiala para pasar ventas anotadas en el cuaderno.')}</span><input type="date" data-fecha max="${hoyISO()}"></label>
+      <div class="campo vr-modo-feria"><span class="campo-etiqueta">En la feria ${info('Pantalla completa con botones grandes, solo para vender: tocas las piezas, eliges cómo paga y cobras. Funciona sin señal. En Android, si mantienes presionado el ícono de la app aparece «Modo feria» para abrirla directo.')}</span><a class="btn btn-primario" href="#/feria">Abrir modo feria</a></div>
     </div>
     <div class="vr">
       <section class="vr-piezas">

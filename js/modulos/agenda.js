@@ -4,12 +4,13 @@ import { estado, alCambiar, enviar } from '../datos.js';
 import { esc, info, toast, $, $$, formulario, confirmar, hoyISO, fechaCorta } from '../ui.js';
 import { nuevoLote, escucharDonde } from '../stock.js';
 import { avisoError, avisoGuardado } from '../comunes.js';
-import { TIPOS_EVENTO, semanasDelMes, itemsAgenda, sumar, diasEntreISO, guardarEvento, marcarHecho, anularEvento, deISO } from '../agenda-core.js';
+import { tiposEventoActivos, semanasDelMes, itemsAgenda, sumar, diasEntreISO, guardarEvento, marcarHecho, anularEvento, deISO } from '../agenda-core.js';
 import { detalleEncargo, dialogoEncargo } from './encargos.js';
 import { detalleOrden } from './ventas-b2b.js';
 import { detalleFeria, editarFeria } from './venta-rapida.js';
 import { ICONOS } from '../iconos.js';
 import { registrarDialogo, editarRecurrente } from './recurrentes.js';
+import { dialogoSesion, editarCurso } from './clases.js';
 import { marcarPagado } from './gastos.js';
 
 const fallo = avisoError(toast);
@@ -29,6 +30,7 @@ export function abrirItem(it) {
   if (it.origen === 'orden') return detalleOrden(estado.ordenes[it.id]);
   if (it.origen === 'feria') return detalleFeria(estado.ferias[it.id]);
   if (it.origen === 'cobro') { location.hash = '#/cobranza/por-cobrar'; }
+  if (it.origen === 'sesion') return dialogoSesion(it.id, it.key);
   if (it.origen === 'recurrente') { const r = estado.recurrentes[it.id]; return it.hecho ? editarRecurrente(r) : registrarDialogo(r, it.periodo); }
   if (it.origen === 'gasto' && it.gasto) return marcarPagado(it.gasto);
   return null;
@@ -72,8 +74,8 @@ export default {
       </div>
       <p class="texto-suave ag-leyenda">
         <span class="ag-punto ag-entrega"></span>Entregas <span class="ag-punto ag-feria"></span>Ferias <span class="ag-punto ag-clase"></span>Clases
-        <span class="ag-punto ag-quema"></span>Quemas <span class="ag-punto ag-cobro"></span>Cobros <span class="ag-punto ag-pago"></span>Pagos <span class="ag-punto ag-otro"></span>Otros
-        ${info('Los encargos, las órdenes por entregar, las ferias, las facturas por cobrar, los gastos por pagar y las cuentas recurrentes aparecen solos: se cambian en su propia sección. Aquí agregas lo demás, como clases, quemas o entregas sin orden.')}
+        <span class="ag-punto ag-cobro"></span>Cobros <span class="ag-punto ag-pago"></span>Pagos
+        ${info('Toca el número de un día para agregar algo en ese día (en el celular, tócalo dos veces). Los colores de tus propios eventos se eligen en Configuración → Listas. ' + 'Los encargos, las órdenes por entregar, las ferias, las facturas por cobrar, los gastos por pagar y las cuentas recurrentes aparecen solos: se cambian en su propia sección. Aquí agregas lo demás, como clases, quemas o entregas sin orden.')}
       </p>`;
     $$('[data-mover]', el).forEach((b) => b.addEventListener('click', () => {
       const d = deISO(mes); d.setMonth(d.getMonth() + Number(b.dataset.mover)); d.setDate(1);
@@ -102,7 +104,14 @@ export default {
             <span class="ag-puntos">${l.slice(0, 4).map((it) => `<span class="ag-punto ${it.clase}"></span>`).join('')}</span>
           </button>`;
         }).join('')}</div>`).join('')}`;
-      $$('[data-fecha]', el).forEach((b) => b.addEventListener('click', () => { dia = b.dataset.fecha; pintar(); }));
+      // Tocar el día lo elige; tocar su número abre «Agregar» para ese día.
+      // En el celular el número ocupa casi todo el día: el primer toque elige y el segundo agrega.
+      const tactil = window.matchMedia?.('(pointer: coarse)').matches;
+      $$('[data-fecha]', el).forEach((b) => b.addEventListener('click', (ev) => {
+        const yaElegido = dia === b.dataset.fecha;
+        dia = b.dataset.fecha; pintar();
+        if (ev.target.closest('.ag-num') && (!tactil || yaElegido)) agregar(dia);
+      }));
 
       const delDia = itemsAgenda(dia, dia, { facturas, gastos });
       const cajaDia = $('[data-dia]', el);
@@ -134,7 +143,8 @@ async function agregar(fecha) {
   const r = await formulario({
     titulo: `Agregar · ${fechaCorta(fecha)}`, textoGuardar: '',
     cuerpo: `<div class="opciones ag-opciones">
-      <button type="button" class="opcion" data-que="evento"><span class="opcion-titulo">Evento</span><span class="opcion-detalle">Clase, quema, entrega sin orden, compra, reunión.</span></button>
+      <button type="button" class="opcion" data-que="evento"><span class="opcion-titulo">Evento</span><span class="opcion-detalle">Quema, entrega sin orden, compra, reunión.</span></button>
+      <button type="button" class="opcion" data-que="clase"><span class="opcion-titulo">Clase o taller</span><span class="opcion-detalle">Un curso de varias sesiones o un taller de un día, con sus alumnos.</span></button>
       <button type="button" class="opcion" data-que="encargo"><span class="opcion-titulo">Encargo</span><span class="opcion-detalle">Piezas a pedido de un cliente, con abono, para entregar este día.</span></button>
       <button type="button" class="opcion" data-que="feria"><span class="opcion-titulo">Feria</span><span class="opcion-detalle">Con sus días y el costo del puesto, para ver su resultado.</span></button>
     </div>`,
@@ -145,6 +155,7 @@ async function agregar(fecha) {
         if (q === 'evento') editarEvento(null, { fecha });
         if (q === 'encargo') dialogoEncargo(null, { fechaEntrega: fecha });
         if (q === 'feria') editarFeria(null, { fecha });
+        if (q === 'clase') editarCurso(null, { fecha });
       }));
     }
   });
@@ -158,7 +169,7 @@ export async function editarEvento(ev = null, { fecha = hoyISO(), tipo = 'clase'
     extra: ev ? `<button type="button" class="btn btn-suave" data-hecho>${ev.hecho ? 'Marcar pendiente' : 'Marcar hecho'}</button><button type="button" class="btn btn-peligro" data-anular>Quitar</button>` : '',
     cuerpo: `<div class="campos">
       <label class="campo campo-ancho"><span class="campo-etiqueta">Qué <span class="req">*</span></span><input name="titulo" value="${esc(d.titulo)}" maxlength="100" placeholder="Ej.: Clase de esmaltes · grupo martes, Quema de esmalte horno 2"></label>
-      <label class="campo"><span class="campo-etiqueta">Tipo</span><select name="tipo">${Object.entries(TIPOS_EVENTO).map(([k, t]) => `<option value="${k}" ${k === d.tipo ? 'selected' : ''}>${esc(t.nombre)}</option>`).join('')}</select></label>
+      <label class="campo"><span class="campo-etiqueta">Tipo ${info('Los tipos y sus colores se cambian en Configuración → Listas → Tipos de evento de la agenda.')}</span><select name="tipo">${tiposEventoActivos().map((t) => `<option value="${esc(t.id)}" ${t.id === d.tipo ? 'selected' : ''}>${esc(t.nombre)}</option>`).join('')}${d.tipo && !tiposEventoActivos().some((t) => t.id === d.tipo) ? `<option value="${esc(d.tipo)}" selected>${esc(d.tipo)}</option>` : ''}</select></label>
       <label class="campo"><span class="campo-etiqueta">Lugar</span><input name="lugar" value="${esc(d.lugar || '')}" maxlength="100" placeholder="Taller"></label>
       <label class="campo"><span class="campo-etiqueta">Día <span class="req">*</span></span><input type="date" name="fecha" value="${esc(d.fecha)}"></label>
       <label class="campo"><span class="campo-etiqueta">Hasta ${info('Solo si dura varios días, como un taller de fin de semana. Si es un solo día, déjalo vacío.')}</span><input type="date" name="fechaFin" value="${esc(d.fechaFin || '')}"></label>

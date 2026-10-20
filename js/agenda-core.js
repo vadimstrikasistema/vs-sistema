@@ -9,14 +9,13 @@ import { saldo } from './cobranza-core.js';
 import { encargoActivo, saldoEncargo, resumenEncargo } from './encargos-core.js';
 import { recurrentesActivos, periodos, registro, vencimientoDe } from './recurrentes-core.js';
 
-export const TIPOS_EVENTO = {
-  entrega: { nombre: 'Entrega', clase: 'ag-entrega' },
-  clase: { nombre: 'Clase o taller', clase: 'ag-clase' },
-  quema: { nombre: 'Quema', clase: 'ag-quema' },
-  compra: { nombre: 'Compra o retiro', clase: 'ag-otro' },
-  reunion: { nombre: 'Reunión', clase: 'ag-otro' },
-  otro: { nombre: 'Otro', clase: 'ag-otro' }
-};
+// Los tipos de evento son una lista editable (Configuración → Listas), cada uno con su color.
+export function tipoEvento(id) {
+  const it = estado.listas.tiposEvento?.items.find((i) => i.id === id);
+  return { nombre: it?.nombre || id || 'Evento', clase: `ag-c-${it?.color || 'gris'}` };
+}
+export const tiposEventoActivos = () => (estado.listas.tiposEvento?.items || []).filter((i) => i.activo).sort((a, b) => a.orden - b.orden);
+
 // Colores de lo que viene de otros módulos.
 export const CLASE_ORIGEN = { feria: 'ag-feria', encargo: 'ag-entrega', orden: 'ag-entrega', cobro: 'ag-cobro', pago: 'ag-pago' };
 
@@ -61,7 +60,7 @@ export function itemsAgenda(desde, hasta, { facturas = [], gastos = [], hoy = ho
     const fin = e.fechaFin && e.fechaFin > e.fecha ? e.fechaFin : e.fecha;
     for (let f = e.fecha; f <= fin; f = sumar(f, 1)) {
       if (!dentro(f)) continue;
-      r.push({ fecha: f, hora: e.hora ? `${e.hora}${e.horaFin ? `–${e.horaFin}` : ''}` : '', titulo: e.titulo, sub: [TIPOS_EVENTO[e.tipo]?.nombre, e.lugar].filter(Boolean).join(' · '), clase: TIPOS_EVENTO[e.tipo]?.clase || 'ag-otro', origen: 'evento', id: e.id, hecho: Boolean(e.hecho), alerta: !e.hecho && f < hoy && e.tipo === 'entrega' });
+      r.push({ fecha: f, hora: e.hora ? `${e.hora}${e.horaFin ? `–${e.horaFin}` : ''}` : '', titulo: e.titulo, sub: [tipoEvento(e.tipo).nombre, e.lugar].filter(Boolean).join(' · '), clase: tipoEvento(e.tipo).clase, origen: 'evento', id: e.id, hecho: Boolean(e.hecho), alerta: !e.hecho && f < hoy && e.tipo === 'entrega' });
     }
   });
   Object.values(estado.ferias).forEach((x) => {
@@ -100,6 +99,15 @@ export function itemsAgenda(desde, hasta, { facturas = [], gastos = [], hoy = ho
       }
       const f = venc < hoy ? hoy : venc;
       if (dentro(f)) r.push({ fecha: f, hora: '', titulo: `Pagar ${x.nombre}`, sub: x.montoEstimado ? `Alrededor de ${pesos(x.montoEstimado)}` : 'Cuenta del mes', clase: CLASE_ORIGEN.pago, origen: 'recurrente', id: x.id, periodo: per, alerta: venc < hoy });
+    });
+  });
+  // Sesiones de clases y talleres.
+  Object.values(estado.cursos || {}).filter((c) => !c.anulado).forEach((c) => {
+    const vivas = (c.sesiones || []).filter((x) => !x.cancelada).sort((a, b) => (a.fecha + (a.hora || '')).localeCompare(b.fecha + (b.hora || '')));
+    const alumnos = (c.alumnos || []).filter((a) => !a.retirado).length;
+    vivas.forEach((x, i) => {
+      if (!dentro(x.fecha)) return;
+      r.push({ fecha: x.fecha, hora: x.hora ? `${x.hora}${x.horaFin ? `–${x.horaFin}` : ''}` : '', titulo: `Clase · ${c.nombre}`, sub: [`Sesión ${i + 1} de ${vivas.length}`, `${alumnos} alumno${alumnos === 1 ? '' : 's'}`, x.tema].filter(Boolean).join(' · '), clase: 'ag-clase', origen: 'sesion', id: c.id, key: x.key, hecho: Boolean(x.hecha) || x.fecha < hoy });
     });
   });
   return r.sort((a, b) => a.fecha.localeCompare(b.fecha) || (a.hora || '99').localeCompare(b.hora || '99') || a.titulo.localeCompare(b.titulo, 'es'));

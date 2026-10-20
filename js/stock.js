@@ -58,6 +58,7 @@ export const TIPOS_MOV = {
   compra: 'Compra',
   produccion: 'Producción de piezas',
   reciclaje: 'Arcilla reciclada',
+  clase: 'Usado en clases',
   anulacion: 'Anulación'
 };
 

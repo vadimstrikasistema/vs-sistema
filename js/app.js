@@ -10,6 +10,7 @@ const raiz = document.getElementById('app');
 const MODULOS = [
   { clave: 'inicio', titulo: 'Inicio', carga: () => import('./modulos/inicio.js') },
   { clave: 'agenda', titulo: 'Agenda', carga: () => import('./modulos/agenda.js') },
+  { clave: 'clases', titulo: 'Clases', carga: () => import('./modulos/clases.js') },
   { clave: 'ventas', titulo: 'Ventas', carga: () => import('./modulos/ventas.js') },
   { clave: 'cobranza', titulo: 'Cobranza', carga: () => import('./modulos/cobranza.js') },
   { clave: 'produccion', titulo: 'Producción', carga: () => import('./modulos/produccion.js') },
@@ -18,6 +19,7 @@ const MODULOS = [
   { clave: 'configuracion', titulo: 'Configuración', carga: () => import('./modulos/configuracion.js') }
 ];
 const EN_BARRA_MOVIL = ['inicio', 'ventas', 'cobranza', 'produccion'];
+const MODO_FERIA = { clave: 'feria', titulo: 'Modo feria', carga: () => import('./modulos/modo-feria.js') };
 
 // ---------------------------------------------------------------- Login
 function pantallaLogin(mensaje = '') {
@@ -167,7 +169,8 @@ async function navegar() {
   const contenido = $('#contenido');
   if (!contenido) return;
   const [clave = 'inicio', sub = ''] = location.hash.replace(/^#\/?/, '').split('/');
-  const mod = MODULOS.find((m) => m.clave === clave) || MODULOS[0];
+  // El modo feria es una pantalla completa que no está en el menú.
+  const mod = clave === 'feria' ? MODO_FERIA : MODULOS.find((m) => m.clave === clave) || MODULOS[0];
   const token = ++rutaToken;
 
   if (typeof limpiarModulo === 'function') limpiarModulo();

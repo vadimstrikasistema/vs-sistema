@@ -28,6 +28,20 @@ export function slug(texto) {
 }
 
 // El orden de este objeto es el orden en que aparecen en Configuración.
+// Tipos de evento de la agenda, con su color. Los ids se fijan a mano porque
+// los eventos ya guardados los usan.
+export const COLORES_AGENDA = {
+  cobalto: 'Cobalto', celadon: 'Celadón', ocre: 'Ocre', arcilla: 'Arcilla', rosa: 'Rosa', carbon: 'Carbón', gris: 'Gris'
+};
+export const TIPOS_EVENTO_INICIALES = {
+  nombre: 'Tipos de evento de la agenda',
+  descripcion: 'Para los eventos que agregas en la Agenda. Cada tipo tiene su color en el calendario.',
+  items: [
+    ['entrega', 'Entrega', 'cobalto'], ['clase', 'Clase o taller', 'celadon'], ['quema', 'Quema', 'arcilla'],
+    ['compra', 'Compra o retiro', 'gris'], ['reunion', 'Reunión', 'gris'], ['otro', 'Otro', 'gris']
+  ].map(([id, nombre, color], orden) => ({ id, nombre, color, activo: true, orden, ...(id === 'otro' ? { fijo: true } : {}) }))
+};
+
 export const LISTAS_INICIALES = {
   tiposInsumo: lista(
     'Tipos de insumo',
@@ -46,9 +60,9 @@ export const LISTAS_INICIALES = {
   ),
   canalesVenta: lista(
     'Canales de venta',
-    'Dónde se hizo cada venta rápida. Feria es fijo porque se enlaza con el módulo de ferias.',
-    ['Feria', 'Taller abierto', 'Instagram', 'WhatsApp', 'Tienda online'],
-    ['Feria']
+    'Dónde se hizo cada venta. Feria y Clases son fijos porque se enlazan con sus módulos.',
+    ['Feria', 'Taller abierto', 'Instagram', 'WhatsApp', 'Tienda online', 'Clases'],
+    ['Feria', 'Clases']
   ),
   mediosPago: lista(
     'Medios de pago',
@@ -66,6 +80,7 @@ export const LISTAS_INICIALES = {
     ['Materia prima e insumos', 'Energía del horno', 'Arriendo', 'Servicios básicos', 'Embalaje', 'Transporte', 'Puestos de feria', 'Herramientas y equipos', 'Publicidad', 'Otros'],
     ['Materia prima e insumos', 'Energía del horno']
   ),
+  tiposEvento: TIPOS_EVENTO_INICIALES,
   motivosMerma: lista(
     'Motivos de merma',
     'Por qué se perdió una pieza en alguna etapa de producción.',

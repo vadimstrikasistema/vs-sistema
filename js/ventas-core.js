@@ -42,7 +42,7 @@ export function totalesCarrito(lineas, medio, descuentoGlobal = 0) {
 // (aunque quede negativo cuando el control de stock está apagado).
 // `pagos` (opcional): cuando la venta se pagó en partes, como un encargo con abono:
 // [{ medio, monto, fecha }]. La comisión se calcula por cada parte.
-export function registrarVenta(lote, { lineas, medio, canal, feriaId = null, cliente = null, fecha, hora, boleta, nota = '', descuento = 0, pagos = null, encargoId = null }) {
+export function registrarVenta(lote, { lineas, medio, canal, feriaId = null, cliente = null, fecha, hora, boleta, nota = '', descuento = 0, pagos = null, encargoId = null, cursoId = null }) {
   const vRef = refNueva('ventas');
   const ref = { tipo: 'venta', id: vRef.id };
   const t = totalesCarrito(lineas, medio, descuento);
@@ -66,6 +66,7 @@ export function registrarVenta(lote, { lineas, medio, canal, feriaId = null, cli
     ...t, costo, comisionPct: comisionDe(medio),
     ...(pagos ? { pagos, comision: pagos.reduce((x, p) => x + Math.round(p.monto * comisionDe(p.medio) / 100), 0) } : {}),
     ...(encargoId ? { encargoId } : {}),
+    ...(cursoId ? { cursoId } : {}),
     boleta: { emitida: Boolean(boleta?.emitida), folio: boleta?.folio || '' },
     nota, movs, anulado: false, ...firma()
   };
@@ -80,6 +81,12 @@ export function anularVenta(lote, v, motivo = '') {
     }
   });
   lote.update(refDoc('ventas', v.id), { anulado: true, motivoAnulacion: motivo, anuladoEn: Date.now(), ...firma() });
+  // Si era el pago de una clase, ese pago queda anulado en el curso.
+  const c = v.cursoId && estado.cursos?.[v.cursoId];
+  if (c) {
+    const alumnos = (c.alumnos || []).map((a) => ({ ...a, pagos: (a.pagos || []).map((p) => (p.ventaId === v.id ? { ...p, anulado: true } : p)) }));
+    lote.update(refDoc('cursos', c.id), { alumnos, ...firma() });
+  }
   // Si venía de un encargo, el encargo vuelve a «listo para entregar» (sus abonos siguen ahí).
   const e = v.encargoId && estado.encargos?.[v.encargoId];
   if (e) lote.update(refDoc('encargos', e.id), { estado: 'listo', ventaId: null, fechaEntregado: null, historial: [...(e.historial || []), { fecha: v.fecha, estado: 'listo' }], ...firma() });

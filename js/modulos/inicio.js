@@ -86,13 +86,15 @@ function semana() {
         </section>`;
 }
 
+const feriaHoy = () => Object.values(estado.ferias || {}).find((f) => !f.cerrada && f.fechaInicio <= hoyISO() && hoyISO() <= (f.fechaFin || f.fechaInicio));
+
 function ventasHoy() {
   const vs = resumenGastos.ventasHoy.filter((v) => !v.anulado);
   const total = vs.reduce((s, v) => s + (v.total || 0), 0);
   const sinBoleta = vs.filter((v) => !v.boleta?.emitida).length;
   return `
         <section class="panel">
-          <div class="panel-cabecera"><h2>Ventas de hoy</h2><a href="#/ventas/venta-rapida" class="btn btn-primario btn-chico">Vender</a></div>
+          <div class="panel-cabecera"><h2>Ventas de hoy</h2><span class="grupo-botones">${feriaHoy() ? '<a href="#/feria" class="btn btn-suave btn-chico">Modo feria</a>' : ''}<a href="#/ventas/venta-rapida" class="btn btn-primario btn-chico">Vender</a></span></div>
           ${vs.length ? `<ul class="lista-bajos">
             <li><a href="#/ventas/historial">${vs.length} venta${vs.length > 1 ? 's' : ''}, ${vs.reduce((s, v) => s + (v.piezas || 0), 0)} piezas</a><span>${pesos(total)}</span></li>
             ${sinBoleta ? `<li><a href="#/ventas/venta-rapida">Sin boleta</a><span class="texto-alerta">${sinBoleta}</span></li>` : ''}
